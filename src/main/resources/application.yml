@@ -1,0 +1,111 @@
+# SpringBoot 配置文件 - 系统性学习笔记
+# 面试重点：配置文件优先级、外部化配置、Profile管理
+
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+  tomcat:
+    threads:
+      max: 200
+      min-spare: 10
+    connection-timeout: 20000
+
+spring:
+  # 应用配置
+  application:
+    name: springboot-learning
+  
+  # 数据源配置 - 面试重点：连接池参数调优
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
+  
+  # JPA配置 - 面试重点：Hibernate配置、N+1问题
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+  
+  # H2控制台配置
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  
+  # Redis配置 - 面试重点：缓存策略、序列化
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: 
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
+  
+  # 缓存配置
+  cache:
+    type: redis
+    redis:
+      time-to-live: 600000
+      cache-null-values: false
+
+# 日志配置 - 面试重点：日志级别、性能优化
+logging:
+  level:
+    com.learning: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/springboot-learning.log
+
+# Actuator配置 - 面试重点：监控指标、健康检查
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# 自定义配置 - 面试重点：@ConfigurationProperties
+app:
+  jwt:
+    secret: mySecretKey
+    expiration: 86400000
+  cache:
+    default-ttl: 3600
+  async:
+    core-pool-size: 5
+    max-pool-size: 20
+    queue-capacity: 100
