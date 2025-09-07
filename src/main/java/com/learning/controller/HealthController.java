@@ -29,6 +29,7 @@ import java.util.Map;
 public class HealthController {
 
     @Autowired(required = false)
+    @org.springframework.beans.factory.annotation.Qualifier("customHealthIndicator")
     private HealthIndicator customHealthIndicator;
 
     /**
