@@ -26,10 +26,11 @@ public class SpringbootLearningApplication {
 
     public static void main(String[] args) {
         // 面试重点：SpringApplication.run() 方法做了什么？
-        // 1. 创建SpringApplication实例
-        // 2. 加载应用上下文
-        // 3. 刷新上下文，完成Bean的创建和依赖注入
-        // 4. 启动内嵌Web服务器
+        // 1. 创建SpringApplication实例(注册上下文初始化器、监听器等)
+        // 2. 创建应用上下文
+        // 3. 准备上下文
+        // 4. 刷新上下文，完成Bean的创建和依赖注入
+        // 5. 启动内嵌Web服务器
         SpringApplication.run(SpringbootLearningApplication.class, args);
     }
 }

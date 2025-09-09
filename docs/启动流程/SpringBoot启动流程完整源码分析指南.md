@@ -744,34 +744,295 @@ protected final void refreshBeanFactory() throws BeansException {
 
 ```java
 protected void prepareBeanFactory(ConfigurableListableBeanFactory beanFactory) {
-    // 设置类加载器
+    // ========== 1. 基础配置设置 ==========
+    
+    // 设置类加载器 - 用于Bean类的加载和反射操作
+    // 这个类加载器通常是从ApplicationContext获取的，用于加载Bean定义中的类
     beanFactory.setBeanClassLoader(getBeanClassLoader());
     
-    // 设置表达式解析器
+    // 设置表达式解析器 - 用于解析SpEL表达式（如@Value注解中的表达式）
+    // StandardBeanExpressionResolver是Spring提供的标准SpEL解析器实现
+    // 支持在Bean定义和注解中使用SpEL表达式，如@Value("#{systemProperties['user.name']}")
     beanFactory.setBeanExpressionResolver(new StandardBeanExpressionResolver(beanFactory.getBeanClassLoader()));
     
-    // 设置属性编辑器注册器
+    // 设置属性编辑器注册器 - 用于类型转换和属性编辑
+    // ResourceEditorRegistrar注册了各种资源相关的属性编辑器
+    // 支持将字符串转换为Resource、URL、ClassPathResource等类型
+    // 例如：@Value("classpath:application.properties") 中的字符串会被转换为ClassPathResource
     beanFactory.addPropertyEditorRegistrar(new ResourceEditorRegistrar(this, getEnvironment()));
     
-    // 添加BeanPostProcessor
+    // ========== 2. 注册核心BeanPostProcessor ==========
+    
+    // 添加ApplicationContextAwareProcessor - 处理各种Aware接口的注入
+    // 这个处理器负责在Bean初始化时注入ApplicationContext相关的依赖
+    // 支持的Aware接口包括：ApplicationContextAware、EnvironmentAware、ResourceLoaderAware等
+    // 当Bean实现了这些接口时，会自动注入相应的对象
     beanFactory.addBeanPostProcessor(new ApplicationContextAwareProcessor(this));
+    
+    // 添加ApplicationListenerDetector - 检测和注册ApplicationListener
+    // 这个处理器负责检测Bean是否实现了ApplicationListener接口
+    // 如果是，则自动将其注册为应用事件监听器
+    // 支持单例Bean和原型Bean的事件监听
     beanFactory.addBeanPostProcessor(new ApplicationListenerDetector(this));
     
-    // 忽略依赖接口
+    // ========== 3. 配置依赖注入忽略规则 ==========
+    
+    // 忽略依赖接口 - 防止循环依赖和重复注入
+    // 当Bean需要注入这些接口类型的依赖时，Spring会忽略自动注入
+    // 因为这些依赖会通过ApplicationContextAwareProcessor手动注入
+    
+    // 忽略EnvironmentAware - 环境对象注入接口
+    // 防止Bean在依赖注入时自动注入Environment，改为通过setEnvironment方法注入
     beanFactory.ignoreDependencyInterface(EnvironmentAware.class);
+    
+    // 忽略EmbeddedValueResolverAware - 嵌入式值解析器注入接口
+    // 用于解析@Value注解中的占位符和SpEL表达式
     beanFactory.ignoreDependencyInterface(EmbeddedValueResolverAware.class);
+    
+    // 忽略ResourceLoaderAware - 资源加载器注入接口
+    // 用于加载类路径、文件系统等资源
     beanFactory.ignoreDependencyInterface(ResourceLoaderAware.class);
+    
+    // 忽略ApplicationEventPublisherAware - 应用事件发布器注入接口
+    // 用于发布应用事件，如ContextRefreshedEvent、ContextStartedEvent等
     beanFactory.ignoreDependencyInterface(ApplicationEventPublisherAware.class);
+    
+    // 忽略MessageSourceAware - 消息源注入接口
+    // 用于国际化消息处理，支持多语言消息解析
     beanFactory.ignoreDependencyInterface(MessageSourceAware.class);
+    
+    // 忽略ApplicationContextAware - 应用上下文注入接口
+    // 最常用的Aware接口，允许Bean直接访问ApplicationContext
     beanFactory.ignoreDependencyInterface(ApplicationContextAware.class);
     
-    // 注册可解析的依赖
+    // ========== 4. 注册可解析的依赖 ==========
+    
+    // 注册可解析的依赖 - 为依赖注入提供特殊类型的解析
+    // 当Bean需要注入这些类型时，Spring会使用注册的实例而不是创建新的Bean
+    
+    // 注册BeanFactory依赖 - 当Bean需要注入BeanFactory时，使用当前的BeanFactory实例
+    // 例如：@Autowired private BeanFactory beanFactory;
     beanFactory.registerResolvableDependency(BeanFactory.class, beanFactory);
+    
+    // 注册ResourceLoader依赖 - 当Bean需要注入ResourceLoader时，使用ApplicationContext
+    // ApplicationContext实现了ResourceLoader接口，可以加载各种资源
+    // 例如：@Autowired private ResourceLoader resourceLoader;
     beanFactory.registerResolvableDependency(ResourceLoader.class, this);
+    
+    // 注册ApplicationEventPublisher依赖 - 当Bean需要发布事件时，使用ApplicationContext
+    // ApplicationContext实现了ApplicationEventPublisher接口，可以发布应用事件
+    // 例如：@Autowired private ApplicationEventPublisher eventPublisher;
     beanFactory.registerResolvableDependency(ApplicationEventPublisher.class, this);
+    
+    // 注册ApplicationContext依赖 - 当Bean需要注入ApplicationContext时，使用当前上下文
+    // 这是最常用的依赖注入，允许Bean直接访问Spring容器
+    // 例如：@Autowired private ApplicationContext applicationContext;
     beanFactory.registerResolvableDependency(ApplicationContext.class, this);
 }
 ```
+
+**prepareBeanFactory方法详细说明：**
+
+### 1. 基础配置设置
+
+- **类加载器设置**：为BeanFactory配置类加载器，用于加载Bean定义中的类
+- **表达式解析器**：配置SpEL表达式解析器，支持@Value注解中的表达式解析
+- **属性编辑器**：注册资源相关的属性编辑器，支持字符串到Resource类型的转换
+
+### 2. 核心BeanPostProcessor注册
+
+- **ApplicationContextAwareProcessor**：处理各种Aware接口的依赖注入
+- **ApplicationListenerDetector**：自动检测和注册事件监听器
+
+### 3. 依赖注入忽略规则
+
+- 防止循环依赖和重复注入
+- 确保Aware接口通过专门的后处理器注入
+
+### 4. 可解析依赖注册
+
+- 为特殊类型提供依赖注入支持
+- 避免创建不必要的Bean实例
+
+**执行时机：** 在BeanFactory创建完成后，Bean定义加载之前执行
+**作用：** 为BeanFactory配置基础功能，为后续的Bean创建和依赖注入做准备
+
+### prepareBeanFactory执行流程图
+
+```mermaid
+graph TD
+    A[prepareBeanFactory开始] --> B[1. 基础配置设置]
+    B --> B1[设置类加载器]
+    B --> B2[设置SpEL表达式解析器]
+    B --> B3[注册属性编辑器]
+    
+    B1 --> C[2. 注册核心BeanPostProcessor]
+    B2 --> C
+    B3 --> C
+    
+    C --> C1[注册ApplicationContextAwareProcessor]
+    C --> C2[注册ApplicationListenerDetector]
+    
+    C1 --> D[3. 配置依赖注入忽略规则]
+    C2 --> D
+    
+    D --> D1[忽略EnvironmentAware]
+    D --> D2[忽略EmbeddedValueResolverAware]
+    D --> D3[忽略ResourceLoaderAware]
+    D --> D4[忽略ApplicationEventPublisherAware]
+    D --> D5[忽略MessageSourceAware]
+    D --> D6[忽略ApplicationContextAware]
+    
+    D1 --> E[4. 注册可解析的依赖]
+    D2 --> E
+    D3 --> E
+    D4 --> E
+    D5 --> E
+    D6 --> E
+    
+    E --> E1[注册BeanFactory依赖]
+    E --> E2[注册ResourceLoader依赖]
+    E --> E3[注册ApplicationEventPublisher依赖]
+    E --> E4[注册ApplicationContext依赖]
+    
+    E1 --> F[prepareBeanFactory完成]
+    E2 --> F
+    E3 --> F
+    E4 --> F
+```
+
+### 实际应用示例
+
+#### 1. Aware接口注入示例
+
+```java
+@Component
+public class MyService implements ApplicationContextAware, EnvironmentAware {
+    
+    private ApplicationContext applicationContext;
+    private Environment environment;
+    
+    // 这些方法会被ApplicationContextAwareProcessor自动调用
+    @Override
+    public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
+        this.applicationContext = applicationContext;
+        System.out.println("ApplicationContext已注入: " + applicationContext.getDisplayName());
+    }
+    
+    @Override
+    public void setEnvironment(Environment environment) {
+        this.environment = environment;
+        System.out.println("Environment已注入: " + environment.getActiveProfiles());
+    }
+    
+    public void doSomething() {
+        // 使用注入的ApplicationContext
+        String[] beanNames = applicationContext.getBeanDefinitionNames();
+        System.out.println("容器中的Bean数量: " + beanNames.length);
+        
+        // 使用注入的Environment
+        String appName = environment.getProperty("spring.application.name", "unknown");
+        System.out.println("应用名称: " + appName);
+    }
+}
+```
+
+#### 2. 事件监听器自动注册示例
+
+```java
+@Component
+public class MyEventListener implements ApplicationListener<ContextRefreshedEvent> {
+    
+    @Override
+    public void onApplicationEvent(ContextRefreshedEvent event) {
+        System.out.println("应用上下文刷新完成: " + event.getApplicationContext().getDisplayName());
+        System.out.println("刷新时间: " + new Date(event.getTimestamp()));
+    }
+}
+
+// 这个类会被ApplicationListenerDetector自动检测并注册为事件监听器
+// 无需手动注册，Spring会自动处理
+```
+
+#### 3. 依赖注入示例
+
+```java
+@Service
+public class UserService {
+    
+    // 这些依赖会被自动注入，因为它们在prepareBeanFactory中注册为可解析依赖
+    @Autowired
+    private BeanFactory beanFactory;
+    
+    @Autowired
+    private ResourceLoader resourceLoader;
+    
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
+    
+    @Autowired
+    private ApplicationContext applicationContext;
+    
+    public void processUser() {
+        // 使用BeanFactory
+        UserRepository userRepo = beanFactory.getBean(UserRepository.class);
+        
+        // 使用ResourceLoader加载资源
+        Resource resource = resourceLoader.getResource("classpath:user-config.properties");
+        
+        // 发布事件
+        eventPublisher.publishEvent(new UserProcessedEvent("用户处理完成"));
+        
+        // 使用ApplicationContext
+        String[] profiles = applicationContext.getEnvironment().getActiveProfiles();
+        System.out.println("当前激活的Profile: " + Arrays.toString(profiles));
+    }
+}
+```
+
+#### 4. SpEL表达式解析示例
+
+```java
+@Component
+public class ConfigService {
+    
+    // 这些@Value注解中的SpEL表达式会被StandardBeanExpressionResolver解析
+    @Value("#{systemProperties['user.name']}")
+    private String systemUser;
+    
+    @Value("#{@userService.getDefaultUser().name}")
+    private String defaultUserName;
+    
+    @Value("#{T(java.lang.Math).random() * 100}")
+    private double randomNumber;
+    
+    @Value("#{environment['spring.profiles.active'] ?: 'default'}")
+    private String activeProfile;
+    
+    public void showConfig() {
+        System.out.println("系统用户: " + systemUser);
+        System.out.println("默认用户名: " + defaultUserName);
+        System.out.println("随机数: " + randomNumber);
+        System.out.println("激活的Profile: " + activeProfile);
+    }
+}
+```
+
+### 关键设计思想
+
+1. **基础设施配置**：为BeanFactory配置必要的基础设施，如类加载器、表达式解析器等
+2. **Aware接口支持**：通过专门的BeanPostProcessor处理Aware接口的依赖注入
+3. **依赖注入优化**：通过忽略规则和可解析依赖注册，优化依赖注入过程
+4. **事件系统支持**：自动检测和注册事件监听器，简化事件驱动的开发
+5. **资源访问支持**：提供统一的资源访问接口，支持各种资源类型的加载
+
+### 面试重点
+
+1. **prepareBeanFactory的作用**：为BeanFactory配置基础功能，为Bean创建做准备
+2. **Aware接口的处理**：通过ApplicationContextAwareProcessor自动注入各种Aware接口
+3. **依赖注入忽略规则**：防止循环依赖，确保Aware接口通过专门处理器注入
+4. **可解析依赖注册**：为特殊类型提供依赖注入支持，避免创建不必要的Bean
+5. **事件监听器自动注册**：通过ApplicationListenerDetector自动检测和注册事件监听器
 
 #### 步骤4：后处理BeanFactory
 
@@ -1065,21 +1326,49 @@ protected void registerBeanPostProcessors(ConfigurableListableBeanFactory beanFa
 #### 步骤7：初始化MessageSource
 
 ```java
+/**
+ * 初始化MessageSource国际化消息源
+ * MessageSource是Spring框架中用于处理国际化消息的核心接口
+ * 支持多语言环境下的消息获取和格式化
+ */
 protected void initMessageSource() {
+    // 获取BeanFactory，用于查找和注册MessageSource Bean
     ConfigurableListableBeanFactory beanFactory = getBeanFactory();
+    
+    // 检查是否已经存在名为"messageSource"的Bean
+    // MESSAGE_SOURCE_BEAN_NAME常量值为"messageSource"
     if (beanFactory.containsLocalBean(MESSAGE_SOURCE_BEAN_NAME)) {
+        // 如果存在，则从BeanFactory中获取该Bean
+        // 这里会触发Bean的实例化过程（如果还未实例化）
         this.messageSource = beanFactory.getBean(MESSAGE_SOURCE_BEAN_NAME, MessageSource.class);
+        
+        // 处理父子容器的MessageSource层次结构
+        // 如果当前容器有父容器，且MessageSource支持层次结构
         if (this.parent != null && this.messageSource instanceof HierarchicalMessageSource) {
+            // 将MessageSource转换为层次结构类型
             HierarchicalMessageSource hms = (HierarchicalMessageSource) this.messageSource;
+            
+            // 如果当前MessageSource没有设置父MessageSource
             if (hms.getParentMessageSource() == null) {
+                // 设置父容器的MessageSource作为当前MessageSource的父级
+                // 这样可以实现消息的层次查找：先在当前容器查找，找不到再在父容器查找
                 hms.setParentMessageSource(getInternalParentMessageSource());
             }
         }
     }
     else {
+        // 如果不存在MessageSource Bean，则创建一个默认的委托MessageSource
+        // DelegatingMessageSource是一个委托实现，会将消息查找委托给父MessageSource
         DelegatingMessageSource dms = new DelegatingMessageSource();
+        
+        // 设置父容器的MessageSource
         dms.setParentMessageSource(getInternalParentMessageSource());
+        
+        // 将创建的MessageSource设置为当前容器的MessageSource
         this.messageSource = dms;
+        
+        // 将MessageSource注册为单例Bean，名称为"messageSource"
+        // 这样其他组件就可以通过@Autowired注入MessageSource了
         beanFactory.registerSingleton(MESSAGE_SOURCE_BEAN_NAME, this.messageSource);
     }
 }
@@ -1088,13 +1377,30 @@ protected void initMessageSource() {
 #### 步骤8：初始化ApplicationEventMulticaster
 
 ```java
+/**
+ * 初始化ApplicationEventMulticaster事件多播器
+ * ApplicationEventMulticaster是Spring事件机制的核心组件
+ * 负责管理事件监听器并向它们广播事件
+ */
 protected void initApplicationEventMulticaster() {
+    // 获取BeanFactory，用于查找和注册ApplicationEventMulticaster Bean
     ConfigurableListableBeanFactory beanFactory = getBeanFactory();
+    
+    // 检查是否已经存在名为"applicationEventMulticaster"的Bean
+    // APPLICATION_EVENT_MULTICASTER_BEAN_NAME常量值为"applicationEventMulticaster"
     if (beanFactory.containsLocalBean(APPLICATION_EVENT_MULTICASTER_BEAN_NAME)) {
+        // 如果存在，则从BeanFactory中获取该Bean
+        // 这里会触发Bean的实例化过程（如果还未实例化）
         this.applicationEventMulticaster = beanFactory.getBean(APPLICATION_EVENT_MULTICASTER_BEAN_NAME, ApplicationEventMulticaster.class);
     }
     else {
+        // 如果不存在ApplicationEventMulticaster Bean，则创建一个默认的简单事件多播器
+        // SimpleApplicationEventMulticaster是ApplicationEventMulticaster的默认实现
+        // 它使用同步方式向所有监听器广播事件
         this.applicationEventMulticaster = new SimpleApplicationEventMulticaster(beanFactory);
+        
+        // 将创建的ApplicationEventMulticaster注册为单例Bean
+        // 这样其他组件就可以通过@Autowired注入ApplicationEventMulticaster了
         beanFactory.registerSingleton(APPLICATION_EVENT_MULTICASTER_BEAN_NAME, this.applicationEventMulticaster);
     }
 }
@@ -1103,40 +1409,75 @@ protected void initApplicationEventMulticaster() {
 #### 步骤9：刷新特定上下文（启动内嵌服务器）
 
 ```java
+/**
+ * ServletWebServerApplicationContext的onRefresh方法
+ * 在Spring容器刷新过程中，会调用特定ApplicationContext的onRefresh方法
+ * 对于Web应用，这里会启动内嵌的Web服务器（如Tomcat、Jetty等）
+ */
 // ServletWebServerApplicationContext.onRefresh()
 @Override
 protected void onRefresh() {
+    // 先调用父类的onRefresh方法，执行通用的刷新逻辑
     super.onRefresh();
     try {
+        // 创建并启动Web服务器
         createWebServer();
     }
     catch (Throwable ex) {
+        // 如果Web服务器启动失败，抛出ApplicationContextException异常
         throw new ApplicationContextException("Unable to start web server", ex);
     }
 }
 
+/**
+ * 创建Web服务器的核心方法
+ * 根据配置选择合适的Web服务器工厂，创建并启动Web服务器
+ */
 private void createWebServer() {
+    // 获取当前Web服务器实例和ServletContext
     WebServer webServer = this.webServer;
     ServletContext servletContext = getServletContext();
+    
+    // 如果Web服务器和ServletContext都不存在，则创建新的Web服务器
     if (webServer == null && servletContext == null) {
+        // 开始记录Web服务器创建的性能指标
         StartupStep createWebServer = getApplicationStartup().start("spring.boot.webserver.create");
+        
+        // 获取Web服务器工厂（如TomcatServletWebServerFactory、JettyServletWebServerFactory等）
         ServletWebServerFactory factory = getWebServerFactory();
+        
+        // 记录工厂类型到性能指标中
         createWebServer.tag("factory", factory.getClass().getSimpleName());
+        
+        // 使用工厂创建Web服务器，并传入ServletContext初始化器
+        // getSelfInitializer()返回一个ServletContextInitializer，用于初始化ServletContext
         this.webServer = factory.getWebServer(getSelfInitializer());
+        
+        // 结束性能指标记录
         createWebServer.end();
+        
+        // 注册Web服务器优雅关闭生命周期Bean
+        // 这个Bean负责在应用关闭时优雅地关闭Web服务器
         getBeanFactory().registerSingleton("webServerGracefulShutdown",
                 new WebServerGracefulShutdownLifecycle(this.webServer));
+        
+        // 注册Web服务器启动停止生命周期Bean
+        // 这个Bean负责管理Web服务器的启动和停止
         getBeanFactory().registerSingleton("webServerStartStop",
                 new WebServerStartStopLifecycle(this, this.webServer));
     }
     else if (servletContext != null) {
+        // 如果ServletContext已存在（如运行在外部容器中），则只进行初始化
         try {
+            // 在现有的ServletContext上执行初始化
             getSelfInitializer().onStartup(servletContext);
         }
         catch (ServletException ex) {
+            // 如果ServletContext初始化失败，抛出ApplicationContextException异常
             throw new ApplicationContextException("Cannot initialize servlet context", ex);
         }
     }
+    // 初始化属性源，用于配置属性的解析和绑定
     initPropertySources();
 }
 ```
@@ -1150,23 +1491,37 @@ private void createWebServer() {
 #### 步骤10：注册监听器
 
 ```java
+/**
+ * 注册ApplicationListener事件监听器
+ * 将各种类型的事件监听器注册到ApplicationEventMulticaster中
+ * 这样当事件发布时，监听器就能接收到相应的事件
+ */
 protected void registerListeners() {
     // 注册静态指定的监听器
+    // 这些监听器是在ApplicationContext创建时通过构造函数或setter方法指定的
     for (ApplicationListener<?> listener : getApplicationListeners()) {
+        // 将监听器添加到事件多播器中
         getApplicationEventMulticaster().addApplicationListener(listener);
     }
     
     // 注册Bean定义中的监听器
+    // 查找所有实现了ApplicationListener接口的Bean
     String[] listenerBeanNames = getBeanNamesForType(ApplicationListener.class, true, false);
     for (String listenerBeanName : listenerBeanNames) {
+        // 将监听器Bean名称添加到事件多播器中
+        // 注意这里添加的是Bean名称，而不是Bean实例，这样可以延迟实例化
         getApplicationEventMulticaster().addApplicationListenerBean(listenerBeanName);
     }
     
     // 发布早期事件
+    // 这些事件在容器完全初始化之前发布，用于通知监听器容器正在启动
     Set<ApplicationEvent> earlyEventsToProcess = this.earlyApplicationEvents;
+    // 清空早期事件集合，避免重复处理
     this.earlyApplicationEvents = null;
     if (earlyEventsToProcess != null) {
+        // 遍历所有早期事件并发布
         for (ApplicationEvent earlyEvent : earlyEventsToProcess) {
+            // 通过事件多播器发布事件，所有注册的监听器都会收到这个事件
             getApplicationEventMulticaster().multicastEvent(earlyEvent);
         }
     }
@@ -1176,24 +1531,50 @@ protected void registerListeners() {
 #### 步骤11：实例化所有单例Bean
 
 ```java
+/**
+ * 完成BeanFactory的初始化
+ * 这是Spring容器启动过程中最核心的步骤之一
+ * 负责实例化所有非懒加载的单例Bean
+ */
 protected void finishBeanFactoryInitialization(ConfigurableListableBeanFactory beanFactory) {
+    // 设置类型转换服务
+    // 检查是否存在名为"conversionService"的Bean，且类型匹配ConversionService
     if (beanFactory.containsBean(CONVERSION_SERVICE_BEAN_NAME) &&
             beanFactory.isTypeMatch(CONVERSION_SERVICE_BEAN_NAME, ConversionService.class)) {
+        // 获取ConversionService Bean并设置为BeanFactory的类型转换服务
+        // ConversionService用于处理类型转换，如String转Integer等
         beanFactory.setConversionService(
                 beanFactory.getBean(CONVERSION_SERVICE_BEAN_NAME, ConversionService.class));
     }
     
+    // 设置嵌入式值解析器
+    // 如果BeanFactory还没有嵌入式值解析器，则添加一个
     if (!beanFactory.hasEmbeddedValueResolver()) {
+        // 添加一个值解析器，用于解析占位符（如${property.name}）
+        // 这个解析器会委托给Environment来解析占位符
         beanFactory.addEmbeddedValueResolver(strVal -> getEnvironment().resolvePlaceholders(strVal));
     }
     
+    // 处理LoadTimeWeaverAware类型的Bean
+    // LoadTimeWeaver用于在类加载时进行字节码增强，主要用于AOP
     String[] weaverAwareNames = beanFactory.getBeanNamesForType(LoadTimeWeaverAware.class, false, false);
     for (String weaverAwareName : weaverAwareNames) {
+        // 提前实例化LoadTimeWeaverAware类型的Bean
+        // 这些Bean需要在其他Bean实例化之前就准备好
         getBean(weaverAwareName);
     }
     
+    // 清除临时类加载器
+    // 在Bean实例化完成后，不再需要临时类加载器
     beanFactory.setTempClassLoader(null);
+    
+    // 冻结BeanFactory配置
+    // 防止在Bean实例化过程中修改Bean定义，确保配置的稳定性
     beanFactory.freezeConfiguration();
+    
+    // 预实例化所有单例Bean
+    // 这是最核心的步骤：实例化所有非懒加载的单例Bean
+    // 包括依赖注入、AOP代理创建、初始化方法调用等
     beanFactory.preInstantiateSingletons();
 }
 ```
