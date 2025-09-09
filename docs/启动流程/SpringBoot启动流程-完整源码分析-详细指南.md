@@ -53,21 +53,40 @@ SpringBoot的启动流程是一个复杂而精妙的过程，主要包含以下�
 
 ### 🚀 启动流程图（含关键代码标注）
 
+**流程图说明：**
+
+- **蓝色节点**：应用入口点
+- **绿色节点**：启动完成
+- **橙色节点**：核心刷新步骤
+- **紫色节点**：详细子流程
+
+**关键类和方法说明：**
+
+- `SpringApplication`：SpringBoot应用启动器，负责整个启动流程的协调
+- `WebApplicationType`：Web应用类型枚举（SERVLET/REACTIVE/NONE）
+- `ApplicationContextInitializer`：应用上下文初始化器接口
+- `ApplicationListener`：应用事件监听器接口
+- `AnnotationConfigServletWebServerApplicationContext`：基于注解配置的Servlet Web服务器应用上下文
+- `AbstractApplicationContext.refresh()`：Spring容器刷新的核心方法
+- `BeanFactoryPostProcessor`：Bean工厂后处理器，用于修改Bean定义
+- `BeanPostProcessor`：Bean后处理器，用于Bean实例化前后的处理
+- `ConfigurationClassPostProcessor`：配置类后处理器，负责组件扫描和自动配置
+
 ```mermaid
 flowchart TD
-    A[🚀 main方法<br/>SpringApplication.run<br/>SpringbootLearningApplication.class, args] --> B[📦 创建SpringApplication实例<br/>new SpringApplication<br/>推断Web应用类型<br/>加载初始化器/监听器]
-    B --> C[⚙️ 运行SpringApplication.run<br/>createBootstrapContext<br/>prepareEnvironment<br/>createApplicationContext<br/>prepareContext<br/>refreshContext]
-    C --> D[🌍 准备环境<br/>getOrCreateEnvironment<br/>configureEnvironment<br/>bindToSpringApplication]
-    D --> E[🏗️ 创建应用上下文<br/>AnnotationConfigServletWebServerApplicationContext<br/>根据WebApplicationType创建]
-    E --> F[🔧 准备上下文<br/>setEnvironment<br/>applyInitializers<br/>load Bean定义<br/>listeners.contextLoaded]
-    F --> G[🔄 刷新应用上下文<br/>AbstractApplicationContext.refresh<br/>12个关键步骤]
-    G --> H[🌐 启动内嵌Web服务器<br/>onRefresh -> createWebServer<br/>Tomcat/Jetty/Undertow]
-    H --> I[✅ 启动完成<br/>publishEvent ContextRefreshedEvent<br/>callRunners]
+    A["🚀 应用入口点<br/>main方法<br/>SpringApplication.run<br/>作用：启动SpringBoot应用的入口"] --> B["📦 创建SpringApplication实例<br/>new SpringApplication<br/>推断Web应用类型<br/>加载初始化器/监听器<br/>作用：初始化SpringBoot应用配置"]
+    B --> C["⚙️ 执行启动流程<br/>SpringApplication.run<br/>包含14个关键步骤<br/>作用：执行完整的应用启动流程"]
+    C --> D["🌍 准备运行环境<br/>getOrCreateEnvironment<br/>configureEnvironment<br/>bindToSpringApplication<br/>作用：加载配置文件，设置属性源"]
+    D --> E["🏗️ 创建应用上下文<br/>AnnotationConfigServletWebServerApplicationContext<br/>根据WebApplicationType创建<br/>作用：根据应用类型创建对应的ApplicationContext"]
+    E --> F["🔧 准备应用上下文<br/>setEnvironment<br/>applyInitializers<br/>load Bean定义<br/>作用：配置上下文环境，执行初始化器"]
+    F --> G["🔄 刷新应用上下文<br/>AbstractApplicationContext.refresh<br/>12个关键步骤<br/>作用：Spring容器启动的核心"]
+    G --> H["🌐 启动内嵌Web服务器<br/>onRefresh -> createWebServer<br/>Tomcat/Jetty/Undertow<br/>作用：创建并启动内嵌的Web服务器"]
+    H --> I["✅ 启动完成<br/>publishEvent ContextRefreshedEvent<br/>callRunners<br/>作用：发布启动完成事件"]
     
     %% 关键子流程
-    B -.-> B1[WebApplicationType.deduceFromClasspath<br/>getSpringFactoriesInstances<br/>ApplicationContextInitializer<br/>ApplicationListener]
-    F -.-> F1[context.setEnvironment<br/>applyInitializers<br/>load主应用类Bean定义<br/>listeners.contextLoaded]
-    G -.-> G1[prepareRefresh<br/>obtainFreshBeanFactory<br/>prepareBeanFactory<br/>postProcessBeanFactory<br/>invokeBeanFactoryPostProcessors<br/>registerBeanPostProcessors<br/>initMessageSource<br/>initApplicationEventMulticaster<br/>onRefresh<br/>registerListeners<br/>finishBeanFactoryInitialization<br/>finishRefresh]
+    B -.-> B1["应用类型推断和组件加载<br/>步骤1: WebApplicationType.deduceFromClasspath<br/>（从类路径推断Web应用类型）<br/>步骤2: getSpringFactoriesInstances<br/>（通过SPI读取spring.factories文件并创建实例：初始化器和监听器）<br/>步骤3: deduceMainApplicationClass<br/>（推断主应用类）"]
+    F -.-> F1["上下文准备详细步骤<br/>步骤1: context.setEnvironment<br/>（设置应用上下文环境）<br/>步骤2: postProcessApplicationContext<br/>（后处理应用上下文）<br/>步骤3: applyInitializers<br/>（应用初始化器）<br/>步骤4: listeners.contextPrepared<br/>（发布上下文准备完成事件）<br/>步骤5: logStartupInfo<br/>（记录启动信息）<br/>步骤6: registerSingleton<br/>（注册单例Bean）<br/>步骤7: setAllowBeanDefinitionOverriding<br/>（设置是否允许Bean定义覆盖）<br/>步骤8: addBeanFactoryPostProcessor<br/>（添加Bean工厂后处理器）<br/>步骤9: getAllSources<br/>（获取所有配置源）<br/>步骤10: load<br/>（加载Bean定义）<br/>步骤11: listeners.contextLoaded<br/>（发布上下文加载完成事件）"]
+    G -.-> G1["刷新上下文12个详细步骤<br/>步骤1: prepareRefresh<br/>（准备刷新：初始化启动时间、状态标志）<br/>步骤2: obtainFreshBeanFactory<br/>（获取新的Bean工厂）<br/>步骤3: prepareBeanFactory<br/>（准备Bean工厂：设置类加载器、后处理器等）<br/>步骤4: postProcessBeanFactory<br/>（后处理Bean工厂）<br/>步骤5: invokeBeanFactoryPostProcessors<br/>（调用Bean工厂后处理器：组件扫描、自动配置）<br/>步骤6: registerBeanPostProcessors<br/>（注册Bean后处理器）<br/>步骤7: initMessageSource<br/>（初始化消息源）<br/>步骤8: initApplicationEventMulticaster<br/>（初始化应用事件多播器）<br/>步骤9: onRefresh<br/>（刷新：启动Web服务器）<br/>步骤10: registerListeners<br/>（注册监听器）<br/>步骤11: finishBeanFactoryInitialization<br/>（完成Bean工厂初始化：实例化所有单例Bean）<br/>步骤12: finishRefresh<br/>（完成刷新：发布上下文刷新完成事件）"]
     
     style A fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
     style I fill:#e8f5e8,stroke:#388e3c,stroke-width:3px
@@ -76,6 +95,55 @@ flowchart TD
     style F1 fill:#f3e5f5,stroke:#7b1fa2
     style G1 fill:#f3e5f5,stroke:#7b1fa2
 ```
+
+### 🔍 组件扫描和自动配置详细流程图
+
+```mermaid
+flowchart TD
+    A["invokeBeanFactoryPostProcessors<br/>调用BeanFactoryPostProcessor"] --> B["ConfigurationClassPostProcessor<br/>配置类后处理器"]
+    B --> C["processConfigBeanDefinitions<br/>处理配置类Bean定义"]
+    C --> D["识别配置类<br/>@Configuration、@Component等"]
+    D --> E["ConfigurationClassParser<br/>配置类解析器"]
+    E --> F["解析配置类<br/>parse方法"]
+    F --> G["组件扫描<br/>ComponentScanAnnotationParser"]
+    F --> H["自动配置<br/>AutoConfigurationImportSelector"]
+    F --> I["Import处理<br/>ImportSelector、ImportBeanDefinitionRegistrar"]
+    
+    G --> G1["ClassPathBeanDefinitionScanner<br/>类路径Bean定义扫描器"]
+    G1 --> G2["doScan方法<br/>执行扫描"]
+    G2 --> G3["findCandidateComponents<br/>查找候选组件"]
+    G3 --> G4["注册Bean定义<br/>@Component、@Service、@Repository、@Controller"]
+    
+    H --> H1["getCandidateConfigurations<br/>获取候选配置"]
+    H1 --> H2["SpringFactoriesLoader<br/>从spring.factories加载"]
+    H2 --> H3["条件注解过滤<br/>@ConditionalOnXxx"]
+    H3 --> H4["注册自动配置Bean定义<br/>各种AutoConfiguration类"]
+    
+    I --> I1["ImportSelector.selectImports<br/>选择导入的类"]
+    I --> I2["ImportBeanDefinitionRegistrar<br/>注册Bean定义"]
+    
+    G4 --> J["ConfigurationClassBeanDefinitionReader<br/>配置类Bean定义读取器"]
+    H4 --> J
+    I1 --> J
+    I2 --> J
+    J --> K["loadBeanDefinitions<br/>加载Bean定义到容器"]
+    
+    style A fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style B fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    style G fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style H fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    style I fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    style K fill:#e8f5e8,stroke:#388e3c,stroke-width:3px
+```
+
+**组件扫描和自动配置关键类说明：**
+
+- `ConfigurationClassPostProcessor`：配置类后处理器，负责处理@Configuration类
+- `ComponentScanAnnotationParser`：组件扫描注解解析器，解析@ComponentScan注解
+- `ClassPathBeanDefinitionScanner`：类路径Bean定义扫描器，执行实际的类扫描
+- `AutoConfigurationImportSelector`：自动配置导入选择器，处理@EnableAutoConfiguration
+- `SpringFactoriesLoader`：Spring工厂加载器，从META-INF/spring.factories加载配置
+- `ConfigurationClassBeanDefinitionReader`：配置类Bean定义读取器，将解析结果注册到容器
 
 ## 📝 详细源码分析（按执行顺序）
 
@@ -849,42 +917,42 @@ protected void prepareBeanFactory(ConfigurableListableBeanFactory beanFactory) {
 ### prepareBeanFactory执行流程图
 
 ```mermaid
-graph TD
-    A[prepareBeanFactory开始] --> B[1. 基础配置设置]
-    B --> B1[设置类加载器]
-    B --> B2[设置SpEL表达式解析器]
-    B --> B3[注册属性编辑器]
+flowchart TD
+    A["prepareBeanFactory开始"] --> B["步骤1: 基础配置设置<br/>（设置Bean工厂的基础配置）"]
+    B --> B1["设置类加载器<br/>（设置BeanClassLoader）"]
+    B --> B2["设置SpEL表达式解析器<br/>（设置StandardBeanExpressionResolver）"]
+    B --> B3["注册属性编辑器<br/>（注册ResourceEditorRegistrar）"]
     
-    B1 --> C[2. 注册核心BeanPostProcessor]
+    B1 --> C["步骤2: 注册核心BeanPostProcessor<br/>（注册Spring核心后处理器）"]
     B2 --> C
     B3 --> C
     
-    C --> C1[注册ApplicationContextAwareProcessor]
-    C --> C2[注册ApplicationListenerDetector]
+    C --> C1["注册ApplicationContextAwareProcessor<br/>（处理ApplicationContextAware接口）"]
+    C --> C2["注册ApplicationListenerDetector<br/>（检测ApplicationListener）"]
     
-    C1 --> D[3. 配置依赖注入忽略规则]
+    C1 --> D["步骤3: 配置依赖注入忽略规则<br/>（配置自动装配时忽略的接口）"]
     C2 --> D
     
-    D --> D1[忽略EnvironmentAware]
-    D --> D2[忽略EmbeddedValueResolverAware]
-    D --> D3[忽略ResourceLoaderAware]
-    D --> D4[忽略ApplicationEventPublisherAware]
-    D --> D5[忽略MessageSourceAware]
-    D --> D6[忽略ApplicationContextAware]
+    D --> D1["忽略EnvironmentAware<br/>（避免循环依赖）"]
+    D --> D2["忽略EmbeddedValueResolverAware<br/>（避免循环依赖）"]
+    D --> D3["忽略ResourceLoaderAware<br/>（避免循环依赖）"]
+    D --> D4["忽略ApplicationEventPublisherAware<br/>（避免循环依赖）"]
+    D --> D5["忽略MessageSourceAware<br/>（避免循环依赖）"]
+    D --> D6["忽略ApplicationContextAware<br/>（避免循环依赖）"]
     
-    D1 --> E[4. 注册可解析的依赖]
+    D1 --> E["步骤4: 注册可解析的依赖<br/>（注册可自动装配的依赖）"]
     D2 --> E
     D3 --> E
     D4 --> E
     D5 --> E
     D6 --> E
     
-    E --> E1[注册BeanFactory依赖]
-    E --> E2[注册ResourceLoader依赖]
-    E --> E3[注册ApplicationEventPublisher依赖]
-    E --> E4[注册ApplicationContext依赖]
+    E --> E1["注册BeanFactory依赖"]
+    E --> E2["注册ResourceLoader依赖"]
+    E --> E3["注册ApplicationEventPublisher依赖"]
+    E --> E4["注册ApplicationContext依赖"]
     
-    E1 --> F[prepareBeanFactory完成]
+    E1 --> F["prepareBeanFactory完成"]
     E2 --> F
     E3 --> F
     E4 --> F
@@ -1597,18 +1665,69 @@ protected void finishRefresh() {
 
 ### 5. Bean生命周期在启动流程中的位置
 
-```java
-// Bean创建过程
-1. 构造函数调用
-2. BeanNameAware.setBeanName()
-3. BeanPostProcessor.postProcessBeforeInitialization()
-4. @PostConstruct方法调用
-5. InitializingBean.afterPropertiesSet()
-6. BeanPostProcessor.postProcessAfterInitialization()
-7. Bean使用阶段
-8. @PreDestroy方法调用
-9. DisposableBean.destroy()
+```mermaid
+flowchart TD
+    A["finishBeanFactoryInitialization<br/>完成BeanFactory初始化"] --> B["preInstantiateSingletons<br/>预实例化单例Bean"]
+    B --> C["getBean方法<br/>获取Bean实例"]
+    C --> D["doGetBean方法<br/>执行Bean获取逻辑"]
+    D --> E["createBean方法<br/>创建Bean实例"]
+    E --> F["doCreateBean方法<br/>执行Bean创建逻辑"]
+    
+    F --> G["步骤1: 实例化Bean<br/>createBeanInstance<br/>（调用构造函数创建Bean实例）"]
+    G --> H["步骤2: 设置Bean属性<br/>populateBean<br/>（进行依赖注入，设置Bean属性）"]
+    H --> I["步骤3: 初始化Bean<br/>initializeBean<br/>（执行Bean的初始化流程）"]
+    
+    I --> J["3.1 BeanNameAware<br/>setBeanName方法<br/>（设置Bean名称）"]
+    J --> K["3.2 BeanClassLoaderAware<br/>setBeanClassLoader方法<br/>（设置类加载器）"]
+    K --> L["3.3 BeanFactoryAware<br/>setBeanFactory方法<br/>（设置Bean工厂）"]
+    L --> M["3.4 BeanPostProcessor<br/>postProcessBeforeInitialization<br/>（初始化前处理）"]
+    M --> N["3.5 @PostConstruct<br/>初始化注解方法<br/>（执行@PostConstruct标注的方法）"]
+    N --> O["3.6 InitializingBean<br/>afterPropertiesSet方法<br/>（执行InitializingBean接口方法）"]
+    O --> P["3.7 自定义init-method<br/>初始化方法<br/>（执行自定义初始化方法）"]
+    P --> Q["3.8 BeanPostProcessor<br/>postProcessAfterInitialization<br/>（初始化后处理）"]
+    
+    Q --> R["Bean创建完成<br/>可以使用"]
+    R --> S["应用运行阶段<br/>Bean正常使用"]
+    S --> T["应用关闭<br/>ContextClosedEvent"]
+    T --> U["销毁Bean<br/>destroy方法"]
+    
+    U --> V["销毁1: @PreDestroy<br/>销毁注解方法<br/>（执行@PreDestroy标注的方法）"]
+    V --> W["销毁2: DisposableBean<br/>destroy方法<br/>（执行DisposableBean接口方法）"]
+    W --> X["销毁3: 自定义destroy-method<br/>销毁方法<br/>（执行自定义销毁方法）"]
+    X --> Y["Bean销毁完成"]
+    
+    style A fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style G fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style H fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    style I fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    style R fill:#e8f5e8,stroke:#388e3c,stroke-width:3px
+    style U fill:#ffebee,stroke:#d32f2f,stroke-width:2px
+    style Y fill:#ffebee,stroke:#d32f2f,stroke-width:3px
 ```
+
+**Bean生命周期详细说明：**
+
+**实例化阶段：**
+
+1. **构造函数调用**：通过反射调用Bean的构造函数创建实例
+2. **设置Bean属性**：通过setter方法或字段注入进行依赖注入
+
+**初始化阶段：**
+
+1. **BeanNameAware.setBeanName()**：设置Bean名称
+2. **BeanClassLoaderAware.setBeanClassLoader()**：设置类加载器
+3. **BeanFactoryAware.setBeanFactory()**：设置BeanFactory引用
+4. **BeanPostProcessor.postProcessBeforeInitialization()**：初始化前处理
+5. **@PostConstruct方法调用**：执行@PostConstruct注解的方法
+6. **InitializingBean.afterPropertiesSet()**：执行InitializingBean接口方法
+7. **自定义init-method**：执行自定义的初始化方法
+8. **BeanPostProcessor.postProcessAfterInitialization()**：初始化后处理
+
+**销毁阶段：**
+
+1. **@PreDestroy方法调用**：执行@PreDestroy注解的方法
+2. **DisposableBean.destroy()**：执行DisposableBean接口方法
+3. **自定义destroy-method**：执行自定义的销毁方法
 
 ## 🔧 关键组件分析
 
@@ -1722,5 +1841,34 @@ public interface BeanPostProcessor {
 | 自动配置 | `org.springframework.boot.autoconfigure.AutoConfigurationImportSelector` | 处理@EnableAutoConfiguration |
 | 配置类处理 | `org.springframework.context.annotation.ConfigurationClassPostProcessor` | 处理@Configuration类 |
 | 条件注解 | `org.springframework.context.annotation.ConditionEvaluator` | 评估@ConditionalOnXxx注解 |
+
+## 📊 启动流程总结
+
+### 核心流程图说明
+
+本文档包含了三个层次的流程图：
+
+1. **主启动流程图**：展示SpringBoot从main方法到启动完成的完整流程
+2. **组件扫描和自动配置流程图**：详细展示第5步invokeBeanFactoryPostProcessors中的核心逻辑
+3. **Bean生命周期流程图**：展示第11步finishBeanFactoryInitialization中Bean的创建过程
+
+### 关键节点说明
+
+- **🚀 应用入口点**：main方法，SpringBoot应用的启动入口
+- **📦 创建SpringApplication实例**：初始化应用配置，推断应用类型
+- **⚙️ 执行启动流程**：包含14个关键步骤的完整启动过程
+- **🌍 准备运行环境**：加载配置文件，设置属性源
+- **🏗️ 创建应用上下文**：根据应用类型创建对应的ApplicationContext
+- **🔧 准备应用上下文**：配置上下文环境，执行初始化器
+- **🔄 刷新应用上下文**：Spring容器启动的核心，包含12个详细步骤
+- **🌐 启动内嵌Web服务器**：创建并启动内嵌的Web服务器
+- **✅ 启动完成**：发布启动完成事件，调用运行器
+
+### 学习建议
+
+1. **按顺序学习**：先理解主流程，再深入子流程
+2. **结合源码**：配合源码分析理解每个步骤的具体实现
+3. **实践验证**：通过断点调试验证流程的执行顺序
+4. **面试重点**：重点关注refresh()方法的12个步骤和Bean生命周期
 
 这个完整的启动流程分析涵盖了SpringBoot启动的所有关键步骤，通过源码分析深入理解了SpringBoot的工作原理和设计思想。无论是面试准备还是实际开发，都能提供全面的指导。
