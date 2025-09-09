@@ -129,7 +129,7 @@ protected void prepareBeanFactory(ConfigurableListableBeanFactory beanFactory) {
 ## 📋 在Bean生命周期中的位置
 
 ```mermaid
-graph TD
+flowchart TD
     A[Bean实例化] --> B[属性注入]
     B --> C[Aware接口回调]
     C --> D[BeanPostProcessor前置处理]
@@ -306,6 +306,7 @@ public class ResourceLoaderService implements ResourceLoaderAware {
 ### 1. Aware接口的作用是什么？
 
 **答案要点**：
+
 - 让Bean能够感知到Spring容器中的特定对象
 - 在Bean初始化过程中自动注入这些对象
 - 提供了一种标准化的方式来获取容器信息
@@ -313,6 +314,7 @@ public class ResourceLoaderService implements ResourceLoaderAware {
 ### 2. Aware接口的调用时机是什么？
 
 **答案要点**：
+
 - 在Bean实例化和属性注入之后
 - 在BeanPostProcessor前置处理之前
 - 通过ApplicationContextAwareProcessor实现
@@ -320,6 +322,7 @@ public class ResourceLoaderService implements ResourceLoaderAware {
 ### 3. 常见的Aware接口有哪些？
 
 **答案要点**：
+
 - BeanNameAware：获取Bean名称
 - BeanFactoryAware：获取BeanFactory
 - ApplicationContextAware：获取ApplicationContext
@@ -330,6 +333,7 @@ public class ResourceLoaderService implements ResourceLoaderAware {
 ### 4. Aware接口的实现原理是什么？
 
 **答案要点**：
+
 - 通过ApplicationContextAwareProcessor实现
 - 在BeanPostProcessor的postProcessBeforeInitialization方法中处理
 - 使用instanceof判断Bean是否实现了特定的Aware接口
@@ -337,6 +341,7 @@ public class ResourceLoaderService implements ResourceLoaderAware {
 ### 5. 为什么要忽略Aware接口的依赖注入？
 
 **答案要点**：
+
 - 防止循环依赖
 - 避免重复注入
 - 确保通过专门的方式注入
@@ -344,6 +349,7 @@ public class ResourceLoaderService implements ResourceLoaderAware {
 ## 🔍 实际应用场景
 
 ### 1. 日志记录
+
 ```java
 @Component
 public class LoggingService implements BeanNameAware {
@@ -361,6 +367,7 @@ public class LoggingService implements BeanNameAware {
 ```
 
 ### 2. 配置读取
+
 ```java
 @Component
 public class ConfigService implements EnvironmentAware {
@@ -378,6 +385,7 @@ public class ConfigService implements EnvironmentAware {
 ```
 
 ### 3. 事件发布
+
 ```java
 @Component
 public class EventService implements ApplicationEventPublisherAware {
@@ -406,6 +414,7 @@ public class EventService implements ApplicationEventPublisherAware {
 Aware接口是Spring IoC容器的一个重要特性，它让Bean能够"感知"到容器的存在，并获取必要的容器信息。虽然它提供了强大的功能，但应该谨慎使用，避免破坏Bean的封装性和增加系统的复杂性。
 
 **核心价值**：
+
 - 解耦：让Bean能够访问Spring容器的核心对象
 - 灵活性：提供标准化的方式获取容器信息
 - 扩展性：可以自定义Aware接口满足特定需求

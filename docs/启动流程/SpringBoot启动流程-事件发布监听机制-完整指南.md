@@ -22,29 +22,64 @@ sequenceDiagram
     participant AL as ApplicationListener
     participant AC as ApplicationContext
 
-    SA->>EPRL: starting()
-    EPRL->>AEM: multicastEvent(ApplicationStartingEvent)
-    AEM->>AL: onApplicationEvent()
+    Note over SA,AC: SpringBoot启动流程中的事件发布监听机制
+    Note over SA,AC: 基于观察者模式，实现松耦合的事件通信
 
-    SA->>EPRL: environmentPrepared()
-    EPRL->>AEM: multicastEvent(ApplicationEnvironmentPreparedEvent)
-    AEM->>AL: onApplicationEvent()
+    rect rgb(240, 248, 255)
+        Note over SA,AL: 阶段1: 应用启动开始
+        SA->>EPRL: starting()<br/>调用启动监听器
+        Note right of EPRL: 应用开始启动，<br/>环境还未准备
+        EPRL->>AEM: multicastEvent(ApplicationStartingEvent)<br/>发布启动事件
+        Note right of AEM: 事件多播器负责<br/>分发事件给监听器
+        AEM->>AL: onApplicationEvent()<br/>通知所有监听器
+        Note right of AL: 监听器处理启动事件
+    end
 
-    SA->>EPRL: contextPrepared()
-    EPRL->>AEM: multicastEvent(ApplicationContextPreparedEvent)
-    AEM->>AL: onApplicationEvent()
+    rect rgb(240, 255, 240)
+        Note over SA,AL: 阶段2: 环境准备完成
+        SA->>EPRL: environmentPrepared()<br/>环境准备完成回调
+        Note right of EPRL: 环境配置加载完成，<br/>但上下文还未创建
+        EPRL->>AEM: multicastEvent(ApplicationEnvironmentPreparedEvent)<br/>发布环境准备事件
+        AEM->>AL: onApplicationEvent()<br/>通知环境准备监听器
+        Note right of AL: 监听器可以访问环境配置
+    end
 
-    SA->>EPRL: contextLoaded()
-    EPRL->>AEM: multicastEvent(ApplicationContextLoadedEvent)
-    AEM->>AL: onApplicationEvent()
+    rect rgb(255, 248, 240)
+        Note over SA,AL: 阶段3: 上下文准备完成
+        SA->>EPRL: contextPrepared()<br/>上下文准备完成回调
+        Note right of EPRL: 上下文创建完成，<br/>但还未刷新
+        EPRL->>AEM: multicastEvent(ApplicationContextPreparedEvent)<br/>发布上下文准备事件
+        AEM->>AL: onApplicationEvent()<br/>通知上下文准备监听器
+        Note right of AL: 监听器可以访问上下文
+    end
 
-    SA->>EPRL: started()
-    EPRL->>AC: publishEvent(ApplicationStartedEvent)
-    AC->>AL: onApplicationEvent()
+    rect rgb(255, 240, 255)
+        Note over SA,AL: 阶段4: 上下文加载完成
+        SA->>EPRL: contextLoaded()<br/>上下文加载完成回调
+        Note right of EPRL: 上下文刷新完成，<br/>Bean定义加载完成
+        EPRL->>AEM: multicastEvent(ApplicationContextLoadedEvent)<br/>发布上下文加载事件
+        AEM->>AL: onApplicationEvent()<br/>通知上下文加载监听器
+        Note right of AL: 监听器可以访问所有Bean
+    end
 
-    SA->>EPRL: running()
-    EPRL->>AC: publishEvent(ApplicationReadyEvent)
-    AC->>AL: onApplicationEvent()
+    rect rgb(248, 255, 248)
+        Note over SA,AL: 阶段5: 应用启动完成
+        SA->>EPRL: started()<br/>应用启动完成回调
+        Note right of EPRL: 所有Bean初始化完成，<br/>但还未调用Runner
+        EPRL->>AC: publishEvent(ApplicationStartedEvent)<br/>通过上下文发布启动完成事件
+        Note right of AC: 此时使用ApplicationContext<br/>作为事件发布器
+        AC->>AL: onApplicationEvent()<br/>通知启动完成监听器
+        Note right of AL: 监听器可以执行启动后逻辑
+    end
+
+    rect rgb(255, 255, 240)
+        Note over SA,AL: 阶段6: 应用就绪
+        SA->>EPRL: running()<br/>应用运行中回调
+        Note right of EPRL: 所有启动任务完成，<br/>应用可以接收请求
+        EPRL->>AC: publishEvent(ApplicationReadyEvent)<br/>发布应用就绪事件
+        AC->>AL: onApplicationEvent()<br/>通知应用就绪监听器
+        Note right of AL: 监听器执行最终初始化逻辑
+    end
 ```
 
 ## 2. 事件体系结构
@@ -163,6 +198,30 @@ flowchart TD
     J --> K{还有监听器?}
     K -->|是| E
     K -->|否| F
+
+    %% 添加详细注释
+    A -.->|注释| A1[ApplicationEventMulticaster<br/>接收事件对象]
+    B -.->|注释| B1[根据事件类型<br/>确定监听器范围]
+    C -.->|注释| C1[从监听器缓存中<br/>查找匹配的监听器]
+    D -.->|注释| D1[检查是否有<br/>注册的监听器]
+    E -.->|注释| E1[按Order顺序<br/>遍历监听器列表]
+    G -.->|注释| G1[检查监听器是否<br/>配置为异步执行]
+    H -.->|注释| H1[提交到线程池<br/>异步执行监听器]
+    I -.->|注释| I1[在当前线程<br/>同步执行监听器]
+    J -.->|注释| J1[调用监听器的<br/>onApplicationEvent方法]
+    K -.->|注释| K1[检查是否还有<br/>其他监听器需要执行]
+    F -.->|注释| F1[所有监听器执行完成<br/>事件处理结束]
+
+    %% 样式定义
+    classDef processBox fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef decisionBox fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef endBox fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef commentBox fill:#f5f5f5,stroke:#616161,stroke-width:1px,stroke-dasharray: 5 5
+
+    class A,B,C,E,H,I,J processBox
+    class D,G,K decisionBox
+    class F endBox
+    class A1,B1,C1,D1,E1,G1,H1,I1,J1,K1,F1 commentBox
 ```
 
 ### 4.2 核心功能
@@ -260,27 +319,66 @@ sequenceDiagram
     participant EPRL as EventPublishingRunListener
     participant AC as ApplicationContext
 
-    SA->>RL: getRunListeners()
-    SA->>EPRL: starting()
-    EPRL->>EPRL: 发布ApplicationStartingEvent
-    
-    SA->>SA: prepareEnvironment()
-    SA->>EPRL: environmentPrepared()
-    EPRL->>EPRL: 发布ApplicationEnvironmentPreparedEvent
-    
-    SA->>SA: createApplicationContext()
-    SA->>EPRL: contextPrepared()
-    EPRL->>EPRL: 发布ApplicationContextPreparedEvent
-    
-    SA->>SA: refreshContext()
-    SA->>EPRL: contextLoaded()
-    EPRL->>EPRL: 发布ApplicationContextLoadedEvent
-    
-    SA->>EPRL: started()
-    EPRL->>AC: 发布ApplicationStartedEvent
-    
-    SA->>EPRL: running()
-    EPRL->>AC: 发布ApplicationReadyEvent
+    Note over SA,AC: SpringBoot启动流程中的事件发布详细时序
+    Note over SA,AC: 展示每个阶段的事件发布时机和上下文切换
+
+    rect rgb(240, 248, 255)
+        Note over SA,AC: 初始化阶段
+        SA->>RL: getRunListeners()<br/>获取所有启动监听器
+        Note right of RL: 从spring.factories加载<br/>EventPublishingRunListener等
+        SA->>EPRL: starting()<br/>调用启动监听器
+        Note right of EPRL: 应用开始启动，<br/>最早的事件发布时机
+        EPRL->>EPRL: 发布ApplicationStartingEvent<br/>通过SimpleApplicationEventMulticaster
+        Note right of EPRL: 此时使用初始多播器，<br/>ApplicationContext还未创建
+    end
+
+    rect rgb(240, 255, 240)
+        Note over SA,AC: 环境准备阶段
+        SA->>SA: prepareEnvironment()<br/>准备应用环境
+        Note right of SA: 加载配置文件、<br/>设置系统属性等
+        SA->>EPRL: environmentPrepared()<br/>环境准备完成回调
+        Note right of EPRL: 环境配置加载完成，<br/>但上下文还未创建
+        EPRL->>EPRL: 发布ApplicationEnvironmentPreparedEvent<br/>环境准备事件
+        Note right of EPRL: 监听器可以访问环境配置，<br/>但无法访问Bean
+    end
+
+    rect rgb(255, 248, 240)
+        Note over SA,AC: 上下文创建阶段
+        SA->>SA: createApplicationContext()<br/>创建应用上下文
+        Note right of SA: 根据应用类型创建<br/>AnnotationConfigApplicationContext等
+        SA->>EPRL: contextPrepared()<br/>上下文准备完成回调
+        Note right of EPRL: 上下文创建完成，<br/>但还未刷新
+        EPRL->>EPRL: 发布ApplicationContextPreparedEvent<br/>上下文准备事件
+        Note right of EPRL: 监听器可以访问上下文，<br/>但Bean还未初始化
+    end
+
+    rect rgb(255, 240, 255)
+        Note over SA,AC: 上下文刷新阶段
+        SA->>SA: refreshContext()<br/>刷新应用上下文
+        Note right of SA: 执行Bean定义扫描、<br/>Bean实例化、依赖注入等
+        SA->>EPRL: contextLoaded()<br/>上下文加载完成回调
+        Note right of EPRL: 上下文刷新完成，<br/>Bean定义加载完成
+        EPRL->>EPRL: 发布ApplicationContextLoadedEvent<br/>上下文加载事件
+        Note right of EPRL: 监听器可以访问所有Bean，<br/>但Runner还未执行
+    end
+
+    rect rgb(248, 255, 248)
+        Note over SA,AC: 启动完成阶段
+        SA->>EPRL: started()<br/>应用启动完成回调
+        Note right of EPRL: 所有Bean初始化完成，<br/>但还未调用Runner
+        EPRL->>AC: 发布ApplicationStartedEvent<br/>通过ApplicationContext发布
+        Note right of AC: 切换到ApplicationContext<br/>作为事件发布器
+        Note right of AC: 此时所有Bean都已就绪，<br/>可以执行复杂的启动逻辑
+    end
+
+    rect rgb(255, 255, 240)
+        Note over SA,AC: 应用就绪阶段
+        SA->>EPRL: running()<br/>应用运行中回调
+        Note right of EPRL: 所有启动任务完成，<br/>应用可以接收请求
+        EPRL->>AC: 发布ApplicationReadyEvent<br/>应用就绪事件
+        Note right of AC: 最终事件，表示应用<br/>完全启动并可以提供服务
+        Note right of AC: 监听器可以执行<br/>最终的业务初始化逻辑
+    end
 ```
 
 ### 6.2 事件发布顺序表
@@ -428,6 +526,34 @@ flowchart TD
     E --> F{还有监听器?}
     F -->|是| D
     F -->|否| G[事件处理完成]
+
+    %% 添加详细注释和说明
+    A -.->|注释| A1[ApplicationEventPublisher<br/>发布事件对象]
+    B -.->|注释| B1[从ApplicationEventMulticaster<br/>获取所有匹配的监听器]
+    C -.->|注释| C1[根据@Order注解或Ordered接口<br/>按优先级排序，数值越小优先级越高]
+    D -.->|注释| D1[按排序后的顺序<br/>逐个处理监听器]
+    E -.->|注释| E1[调用监听器的<br/>onApplicationEvent方法]
+    F -.->|注释| F1[检查是否还有<br/>其他监听器需要执行]
+    G -.->|注释| G1[所有监听器执行完成<br/>事件处理流程结束]
+
+    %% 添加执行顺序示例
+    H[执行顺序示例] -.->|示例| H1[@Order(1) - 最高优先级<br/>@Order(100) - 中等优先级<br/>@Order(1000) - 最低优先级]
+    
+    %% 添加异常处理说明
+    I[异常处理] -.->|说明| I1[监听器执行异常不会影响<br/>其他监听器的执行<br/>但会影响事件处理流程]
+
+    %% 样式定义
+    classDef processBox fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
+    classDef decisionBox fill:#fff8e1,stroke:#f57c00,stroke-width:2px
+    classDef endBox fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef commentBox fill:#f5f5f5,stroke:#616161,stroke-width:1px,stroke-dasharray: 5 5
+    classDef exampleBox fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+
+    class A,B,C,D,E processBox
+    class F decisionBox
+    class G endBox
+    class A1,B1,C1,D1,E1,F1,G1,I1 commentBox
+    class H,H1 exampleBox
 ```
 
 ## 9. 异步事件处理
@@ -475,6 +601,42 @@ flowchart TD
     E --> G[同步执行监听器]
     F --> H[事件处理完成]
     G --> H
+
+    %% 添加详细注释
+    A -.->|注释| A1[ApplicationEventPublisher<br/>发布事件对象]
+    B -.->|注释| B1[ApplicationEventMulticaster<br/>获取所有匹配的监听器]
+    C -.->|注释| C1[检查监听器是否配置了<br/>@Async注解或异步执行器]
+    D -.->|注释| D1[将监听器任务提交到<br/>TaskExecutor线程池]
+    E -.->|注释| E1[在当前线程中<br/>同步执行监听器]
+    F -.->|注释| F1[在独立线程中<br/>异步执行监听器方法]
+    G -.->|注释| G1[在当前线程中<br/>同步执行监听器方法]
+    H -.->|注释| H1[所有监听器执行完成<br/>事件处理流程结束]
+
+    %% 添加异步配置说明
+    I[异步配置] -.->|配置| I1[SimpleApplicationEventMulticaster<br/>setTaskExecutor(executor)<br/>启用异步事件处理]
+    
+    %% 添加线程池说明
+    J[线程池配置] -.->|说明| J1[SimpleAsyncTaskExecutor<br/>ThreadPoolTaskExecutor<br/>自定义TaskExecutor]
+
+    %% 添加异常处理说明
+    K[异常处理] -.->|说明| K1[异步监听器异常不会影响<br/>同步监听器的执行<br/>但需要配置异常处理器]
+
+    %% 样式定义
+    classDef processBox fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
+    classDef decisionBox fill:#fff8e1,stroke:#f57c00,stroke-width:2px
+    classDef asyncBox fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef syncBox fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef endBox fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef commentBox fill:#f5f5f5,stroke:#616161,stroke-width:1px,stroke-dasharray: 5 5
+    classDef configBox fill:#fff3e0,stroke:#e65100,stroke-width:2px
+
+    class A,B processBox
+    class C decisionBox
+    class D,F asyncBox
+    class E,G syncBox
+    class H endBox
+    class A1,B1,C1,D1,E1,F1,G1,H1,K1 commentBox
+    class I,I1,J,J1 configBox
 ```
 
 ## 10. 自定义事件类型
@@ -587,19 +749,19 @@ public class BestPracticeEventListener {
 
 ### 11.3 常见问题解决
 
-**问题1: 事件监听器未执行**
+#### 问题1: 事件监听器未执行
 
 - 确保监听器被正确注册为Spring Bean
 - 检查事件类型是否匹配
 - 验证条件化监听的条件是否正确
 
-**问题2: 执行顺序问题**
+#### 问题2: 执行顺序问题
 
 - 使用@Order注解控制执行顺序
 - 实现Ordered接口
 - 数值越小，优先级越高
 
-**问题3: 异步事件处理异常**
+#### 问题3: 异步事件处理异常
 
 - 配置异常处理器
 - 使用@EnableAsync启用异步支持

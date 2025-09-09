@@ -1,6 +1,6 @@
 # SpringBoot启动流程完整源码分析指南
 
-## 🎯 启动流程概览
+## 🎯 SpringBoot启动流程概览
 
 SpringBoot的启动流程是一个复杂而精妙的过程，主要包含以下几个关键阶段：
 
@@ -51,41 +51,30 @@ SpringBoot的启动流程是一个复杂而精妙的过程，主要包含以下�
    - 发布ContextRefreshedEvent事件
    - 调用ApplicationRunner和CommandLineRunner
 
+### 🚀 启动流程图（含关键代码标注）
+
 ```mermaid
-graph TD
-    A[main方法] --> B[创建SpringApplication实例]
-    B --> C[运行SpringApplication.run]
-    C --> D[准备环境]
-    D --> E[创建应用上下文]
-    E --> F[准备上下文]
-    F --> G[刷新应用上下文]
-    G --> H[启动内嵌Web服务器]
-    H --> I[启动完成]
+flowchart TD
+    A[🚀 main方法<br/>SpringApplication.run<br/>SpringbootLearningApplication.class, args] --> B[📦 创建SpringApplication实例<br/>new SpringApplication<br/>推断Web应用类型<br/>加载初始化器/监听器]
+    B --> C[⚙️ 运行SpringApplication.run<br/>createBootstrapContext<br/>prepareEnvironment<br/>createApplicationContext<br/>prepareContext<br/>refreshContext]
+    C --> D[🌍 准备环境<br/>getOrCreateEnvironment<br/>configureEnvironment<br/>bindToSpringApplication]
+    D --> E[🏗️ 创建应用上下文<br/>AnnotationConfigServletWebServerApplicationContext<br/>根据WebApplicationType创建]
+    E --> F[🔧 准备上下文<br/>setEnvironment<br/>applyInitializers<br/>load Bean定义<br/>listeners.contextLoaded]
+    F --> G[🔄 刷新应用上下文<br/>AbstractApplicationContext.refresh<br/>12个关键步骤]
+    G --> H[🌐 启动内嵌Web服务器<br/>onRefresh -> createWebServer<br/>Tomcat/Jetty/Undertow]
+    H --> I[✅ 启动完成<br/>publishEvent ContextRefreshedEvent<br/>callRunners]
     
-    B --> B1[推断Web应用类型]
-    B --> B2[加载ApplicationContextInitializer]
-    B --> B3[加载ApplicationListener]
+    %% 关键子流程
+    B -.-> B1[WebApplicationType.deduceFromClasspath<br/>getSpringFactoriesInstances<br/>ApplicationContextInitializer<br/>ApplicationListener]
+    F -.-> F1[context.setEnvironment<br/>applyInitializers<br/>load主应用类Bean定义<br/>listeners.contextLoaded]
+    G -.-> G1[prepareRefresh<br/>obtainFreshBeanFactory<br/>prepareBeanFactory<br/>postProcessBeanFactory<br/>invokeBeanFactoryPostProcessors<br/>registerBeanPostProcessors<br/>initMessageSource<br/>initApplicationEventMulticaster<br/>onRefresh<br/>registerListeners<br/>finishBeanFactoryInitialization<br/>finishRefresh]
     
-    F --> F1[设置环境]
-    F --> F2[应用初始化器]
-    F --> F3[加载主应用类的Bean定义]
-    F --> F4[通知监听器]
-    
-    G --> G1[准备刷新]
-    G --> G2[获取BeanFactory]
-    G --> G3[准备BeanFactory]
-    G --> G4[后处理BeanFactory]
-    G --> G5[调用BeanFactoryPostProcessor]
-    G5 --> G5A[组件扫描]
-    G5 --> G5B[自动配置]
-    G5 --> G5C[条件注解评估]
-    G --> G6[注册BeanPostProcessor]
-    G --> G7[初始化MessageSource]
-    G --> G8[初始化ApplicationEventMulticaster]
-    G --> G9[启动内嵌服务器]
-    G --> G10[注册监听器]
-    G --> G11[实例化单例Bean]
-    G --> G12[完成刷新]
+    style A fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    style I fill:#e8f5e8,stroke:#388e3c,stroke-width:3px
+    style G fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style B1 fill:#f3e5f5,stroke:#7b1fa2
+    style F1 fill:#f3e5f5,stroke:#7b1fa2
+    style G1 fill:#f3e5f5,stroke:#7b1fa2
 ```
 
 ## 📝 详细源码分析（按执行顺序）
@@ -1619,47 +1608,6 @@ protected void finishRefresh() {
 7. Bean使用阶段
 8. @PreDestroy方法调用
 9. DisposableBean.destroy()
-```
-
-## 📊 启动流程时序图
-
-```mermaid
-sequenceDiagram
-    participant Main as main方法
-    participant SA as SpringApplication
-    participant AC as ApplicationContext
-    participant BF as BeanFactory
-    participant WS as WebServer
-    
-    Main->>SA: new SpringApplication()
-    Note over SA: 1. 推断Web应用类型<br/>2. 加载ApplicationContextInitializer<br/>3. 加载ApplicationListener<br/>4. 推断主应用类
-    
-    Main->>SA: run(args)
-    Note over SA: 1. 创建BootstrapContext<br/>2. 准备环境<br/>3. 创建应用上下文<br/>4. 准备上下文<br/>5. 刷新上下文
-    
-    SA->>AC: createApplicationContext()
-    AC->>AC: 创建AnnotationConfigServletWebServerApplicationContext
-    
-    SA->>AC: prepareContext()
-    Note over AC: 1. 设置环境<br/>2. 应用初始化器<br/>3. 加载Bean定义<br/>4. 通知监听器
-    
-    SA->>AC: refresh()
-    AC->>BF: obtainFreshBeanFactory()
-    AC->>BF: prepareBeanFactory()
-    AC->>BF: postProcessBeanFactory()
-    AC->>BF: invokeBeanFactoryPostProcessors()
-    Note over BF: 组件扫描和自动配置
-    AC->>BF: registerBeanPostProcessors()
-    AC->>AC: initMessageSource()
-    AC->>AC: initApplicationEventMulticaster()
-    AC->>WS: onRefresh() -> createWebServer()
-    WS->>WS: 启动Tomcat服务器
-    AC->>AC: registerListeners()
-    AC->>BF: finishBeanFactoryInitialization()
-    Note over BF: 实例化所有单例Bean
-    AC->>AC: finishRefresh()
-    
-    SA->>Main: 返回ApplicationContext
 ```
 
 ## 🔧 关键组件分析
