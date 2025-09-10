@@ -18,14 +18,14 @@ SpringBoot的自动配置机制是其核心特性之一，它能够根据类路�
 sequenceDiagram
     participant App as SpringBoot应用
     participant Selector as AutoConfigurationImportSelector
-    participant Loader as SpringFactoriesLoader
+    participant Loader as ImportCandidates
     participant Filter as ConfigurationClassFilter
     participant Parser as ConfigurationClassParser
     participant Registry as BeanDefinitionRegistry
 
     App->>Selector: 启动时调用selectImports()
     Selector->>Selector: 检查是否启用自动配置
-    Selector->>Loader: 加载META-INF/spring.factories
+    Selector->>Loader: 加载META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports
     Loader-->>Selector: 返回所有自动配置类
     Selector->>Selector: 去重处理
     Selector->>Selector: 获取排除的配置类
@@ -54,15 +54,15 @@ public class Application {
 
 ```mermaid
 flowchart TD
-    A[SpringBoot启动] --> B[@EnableAutoConfiguration生效]
-    B --> C[AutoConfigurationImportSelector.selectImports]
-    C --> D[加载META-INF/spring.factories]
-    D --> E[获取所有自动配置类]
-    E --> F[去重处理]
-    F --> G[获取排除配置]
-    G --> H[条件注解过滤]
-    H --> I[返回最终配置类]
-    I --> J[解析并注册Bean]
+    A["SpringBoot启动"] --> B["@EnableAutoConfiguration生效"]
+    B --> C["AutoConfigurationImportSelector.selectImports"]
+    C --> D["加载META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports"]
+    D --> E["获取所有自动配置类"]
+    E --> F["去重处理"]
+    F --> G["获取排除配置"]
+    G --> H["条件注解过滤"]
+    H --> I["返回最终配置类"]
+    I --> J["解析并注册Bean"]
     
     style A fill:#e1f5fe
     style J fill:#c8e6c9
@@ -95,21 +95,34 @@ public String[] selectImports(AnnotationMetadata annotationMetadata) {
 
 ```mermaid
 flowchart LR
-    A[getCandidateConfigurations] --> B[SpringFactoriesLoader.loadFactoryNames]
-    B --> C[读取META-INF/spring.factories]
+    A[getCandidateConfigurations] --> B[ImportCandidates.load]
+    B --> C[读取META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports]
     C --> D[返回所有自动配置类]
     
     style A fill:#fff3e0
     style D fill:#e8f5e8
 ```
 
+**重要变化说明**:
+
+从SpringBoot 2.7开始，自动配置类的加载方式发生了变化：
+
+- **旧版本**: 使用`SpringFactoriesLoader.loadFactoryNames()`从`META-INF/spring.factories`文件加载
+- **新版本**: 使用`ImportCandidates.load()`从`META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`文件加载
+
+新方式的优势：
+
+1. **更清晰的命名**: 文件名明确表示其用途
+2. **更好的性能**: 减少了不必要的解析开销
+3. **更简单的格式**: 每行一个配置类，无需键值对格式
+
 **关键代码**:
 
 ```java
 protected List<String> getCandidateConfigurations(AnnotationMetadata metadata, AnnotationAttributes attributes) {
-    // 从META-INF/spring.factories文件中加载自动配置类
-    List<String> configurations = SpringFactoriesLoader.loadFactoryNames(
-        EnableAutoConfiguration.class, getBeanClassLoader());
+    // 从META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports文件中加载自动配置类
+    List<String> configurations = ImportCandidates.load(AutoConfiguration.class, this.getBeanClassLoader()).getCandidates();
+    Assert.notEmpty(configurations, "No auto configuration classes found in META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports. If you are using a custom packaging, make sure that file is correct.");
     return configurations;
 }
 ```
@@ -229,7 +242,7 @@ public class RedisAutoConfiguration {
 
 ### 6.1 排除自动配置类
 
-**方式一: 注解排除**
+#### 方式一: 注解排除
 
 ```java
 @SpringBootApplication(exclude = { 
@@ -243,7 +256,7 @@ public class Application {
 }
 ```
 
-**方式二: 属性排除**
+#### 方式二: 属性排除
 
 ```yaml
 # application.yml
@@ -254,7 +267,7 @@ spring:
       - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
 ```
 
-**方式三: 启动参数排除**
+#### 方式三: 启动参数排除
 
 ```bash
 java -jar app.jar --spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
@@ -313,10 +326,9 @@ public class CustomProperties {
 
 ### 7.3 注册自动配置类
 
-**META-INF/spring.factories**:
+**META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports**:
 
 ```properties
-org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
 com.example.autoconfigure.CustomAutoConfiguration
 ```
 
@@ -378,18 +390,18 @@ public class CustomAutoConfigurationDisabledTest {
 
 ### 9.2 常见问题解决
 
-**问题1: 自动配置类不生效**
+#### 问题1: 自动配置类不生效
 
-- 检查`META-INF/spring.factories`文件
+- 检查`META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`文件
 - 验证条件注解是否正确
 - 确认类路径中是否存在依赖
 
-**问题2: 配置类冲突**
+#### 问题2: 配置类冲突
 
 - 使用`@AutoConfigureOrder`设置优先级
 - 使用`@ConditionalOnSingleCandidate`避免冲突
 
-**问题3: 配置属性绑定失败**
+#### 问题3: 配置属性绑定失败
 
 - 使用`@Validated`进行验证
 - 在`@PostConstruct`方法中验证配置

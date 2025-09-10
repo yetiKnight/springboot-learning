@@ -115,7 +115,7 @@ flowchart TD
     G3 --> G4["注册Bean定义<br/>@Component、@Service、@Repository、@Controller"]
     
     H --> H1["getCandidateConfigurations<br/>获取候选配置"]
-    H1 --> H2["SpringFactoriesLoader<br/>从spring.factories加载"]
+    H1 --> H2["ImportCandidates.load<br/>从AutoConfiguration.imports加载"]
     H2 --> H3["条件注解过滤<br/>@ConditionalOnXxx"]
     H3 --> H4["注册自动配置Bean定义<br/>各种AutoConfiguration类"]
     
@@ -142,7 +142,7 @@ flowchart TD
 - `ComponentScanAnnotationParser`：组件扫描注解解析器，解析@ComponentScan注解
 - `ClassPathBeanDefinitionScanner`：类路径Bean定义扫描器，执行实际的类扫描
 - `AutoConfigurationImportSelector`：自动配置导入选择器，处理@EnableAutoConfiguration
-- `SpringFactoriesLoader`：Spring工厂加载器，从META-INF/spring.factories加载配置
+- `ImportCandidates`：导入候选加载器，从META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports加载配置
 - `ConfigurationClassBeanDefinitionReader`：配置类Bean定义读取器，将解析结果注册到容器
 
 ## 📝 详细源码分析（按执行顺序）
@@ -202,7 +202,7 @@ public SpringApplication(ResourceLoader resourceLoader, Class<?>... primarySourc
 
 - 推断应用类型（SERVLET/REACTIVE/NONE）
 - 加载各种初始化器和监听器
-- 从spring.factories文件加载配置
+- 从spring.factories文件加载配置（初始化器和监听器）
 
 #### 2.1 Web应用类型推断
 
@@ -246,7 +246,7 @@ private <T> Collection<T> getSpringFactoriesInstances(Class<T> type) {
 private <T> Collection<T> getSpringFactoriesInstances(Class<T> type, Class<?>[] parameterTypes, Object... args) {
     ClassLoader classLoader = getClassLoader();
     
-    // 从META-INF/spring.factories加载工厂类名
+    // 从META-INF/spring.factories加载工厂类名（初始化器和监听器）
     Set<String> names = new LinkedHashSet<>(SpringFactoriesLoader.loadFactoryNames(type, classLoader));
     
     // 通过反射创建实例
@@ -260,7 +260,7 @@ private <T> Collection<T> getSpringFactoriesInstances(Class<T> type, Class<?>[] 
 
 **加载过程：**
 
-1. 扫描`META-INF/spring.factories`文件
+1. 扫描`META-INF/spring.factories`文件（初始化器和监听器）
 2. 根据类型加载对应的实现类
 3. 通过反射创建实例
 4. 按照`@Order`注解排序
@@ -1137,7 +1137,7 @@ public static void invokeBeanFactoryPostProcessors(
     // - 处理@Configuration类
     // - 执行@Import注解
     // - 处理@ConditionalOnXxx条件注解
-    // - 加载spring.factories中的自动配置类
+    // - 加载AutoConfiguration.imports中的自动配置类
 }
 ```
 
@@ -1348,11 +1348,10 @@ protected AutoConfigurationEntry getAutoConfigurationEntry(AnnotationMetadata an
     return new AutoConfigurationEntry(configurations, exclusions);
 }
 
-// 从spring.factories加载自动配置类
+// 从AutoConfiguration.imports加载自动配置类（SpringBoot 2.7+）
 protected List<String> getCandidateConfigurations(AnnotationMetadata metadata, AnnotationAttributes attributes) {
-    List<String> configurations = SpringFactoriesLoader.loadFactoryNames(getSpringFactoriesLoaderFactoryClass(),
-            getBeanClassLoader());
-    Assert.notEmpty(configurations, "No auto configuration classes found in META-INF/spring.factories. " +
+    List<String> configurations = ImportCandidates.load(AutoConfiguration.class, getBeanClassLoader()).getCandidates();
+    Assert.notEmpty(configurations, "No auto configuration classes found in META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports. " +
             "If you are using a custom packaging, make sure that file is correct.");
     return configurations;
 }
@@ -1361,10 +1360,16 @@ protected List<String> getCandidateConfigurations(AnnotationMetadata metadata, A
 **关键点：**
 
 - **组件扫描**：在BeanFactoryPostProcessor阶段扫描@Component、@Service等注解
-- **自动配置**：通过@EnableAutoConfiguration触发，加载spring.factories中的配置类
+- **自动配置**：通过@EnableAutoConfiguration触发，从AutoConfiguration.imports文件加载配置类（SpringBoot 2.7+）
 - **条件注解**：@ConditionalOnXxx注解在这里被评估和执行
 - **Bean定义注册**：扫描到的类和自动配置类被注册为Bean定义
 - **优先级处理**：按照@Order、@Priority等注解排序执行
+
+**版本变化说明：**
+
+- **SpringBoot 2.7之前**：使用`SpringFactoriesLoader.loadFactoryNames()`从`META-INF/spring.factories`文件加载
+- **SpringBoot 2.7+**：使用`ImportCandidates.load()`从`META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`文件加载
+- **新方式优势**：更清晰的命名、更好的性能、更简单的文件格式
 
 #### 步骤6：注册BeanPostProcessor
 
@@ -1804,7 +1809,7 @@ public interface BeanPostProcessor {
 ### 3. 组件扫描和自动配置原理
 
 - **组件扫描**：在BeanFactoryPostProcessor阶段，通过ConfigurationClassPostProcessor扫描@Component、@Service等注解
-- **自动配置**：通过@EnableAutoConfiguration触发，从spring.factories文件加载配置类
+- **自动配置**：通过@EnableAutoConfiguration触发，从AutoConfiguration.imports文件加载配置类
 - **条件注解**：@ConditionalOnXxx注解在ConfigurationClassPostProcessor阶段被评估
 - **Bean定义注册**：扫描到的类和自动配置类被注册为Bean定义
 - **执行时机**：在refresh()方法的第5步invokeBeanFactoryPostProcessors()中执行
@@ -1825,7 +1830,7 @@ public interface BeanPostProcessor {
 6. **组件扫描是在哪个阶段执行的？**
 7. **@ComponentScan和@EnableAutoConfiguration的区别？**
 8. **@ConditionalOnXxx条件注解是如何工作的？**
-9. **spring.factories文件的作用是什么？**
+9. **AutoConfiguration.imports文件的作用是什么？**
 10. **ConfigurationClassPostProcessor的作用是什么？**
 
 ## 📚 源码位置总结

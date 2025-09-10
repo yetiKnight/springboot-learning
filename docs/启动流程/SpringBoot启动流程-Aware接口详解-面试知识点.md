@@ -133,12 +133,12 @@ flowchart TD
     A[Bean实例化] --> B[属性注入]
     B --> C[Aware接口回调]
     C --> D[BeanPostProcessor前置处理]
-    D --> E[@PostConstruct方法]
+    D --> E["@PostConstruct方法"]
     E --> F[InitializingBean.afterPropertiesSet]
     F --> G[BeanPostProcessor后置处理]
     G --> H[Bean使用]
     H --> I[容器销毁]
-    I --> J[@PreDestroy方法]
+    I --> J["@PreDestroy方法"]
     J --> K[DisposableBean.destroy]
     
     style C fill:#ffeb3b
@@ -213,35 +213,7 @@ public class AwareDemoService implements
 }
 ```
 
-### 2. 自定义事件发布
-
-```java
-// 自定义事件
-public class CustomEvent extends ApplicationEvent {
-    private final String message;
-    
-    public CustomEvent(String message) {
-        super(message);
-        this.message = message;
-    }
-    
-    public String getMessage() {
-        return message;
-    }
-}
-
-// 事件监听器
-@Component
-public class CustomEventListener {
-    
-    @EventListener
-    public void handleCustomEvent(CustomEvent event) {
-        System.out.println("收到自定义事件: " + event.getMessage());
-    }
-}
-```
-
-### 3. 动态Bean操作
+### 2. 动态Bean操作
 
 ```java
 @Component
@@ -275,7 +247,7 @@ public class DynamicBeanService implements BeanFactoryAware {
 }
 ```
 
-### 4. 资源加载示例
+### 3. 资源加载示例
 
 ```java
 @Component
