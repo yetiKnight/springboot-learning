@@ -80,6 +80,7 @@ Object earlySingletonReference = getSingleton("a", false);
 // 4. B创建完成，放入一级缓存
 // 5. A获取B的完整实例，完成创建
 ```
+**注意：** SpringBoot 2.6+ 默认禁止循环依赖，临时过渡可用 @Lazy 或 @DependsOn 解决。最好的解决方案是中间层解耦。 
 
 ## 🔧 技术实现类问题
 
