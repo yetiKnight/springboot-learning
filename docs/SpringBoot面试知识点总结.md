@@ -70,17 +70,26 @@ private final Map<String, ObjectFactory<?>> singletonFactories = new HashMap<>(1
 **三级缓存解决过程：**
 ```java
 // A依赖B，B依赖A的情况
-// 1. A开始创建，放入三级缓存
+// 1. A开始实例化，发现依赖B,这时候将已经实例化的A BeanFactory放入三级缓存
 singletonFactories.put("a", () -> getEarlyBeanReference("a", mbd, a));
 
 // 2. A需要B，开始创建B
-// 3. B需要A，从三级缓存获取A的早期引用
+// 3. B需要A，从三级缓存通过A BeanFactory获取A的早期引用，并放入到二级缓存中
 Object earlySingletonReference = getSingleton("a", false);
 
 // 4. B创建完成，放入一级缓存
 // 5. A获取B的完整实例，完成创建
 ```
-**注意：** SpringBoot 2.6+ 默认禁止循环依赖，临时过渡可用 @Lazy 或 @DependsOn 解决。最好的解决方案是中间层解耦。 
+**注意：** SpringBoot 2.6+ 默认禁止循环依赖，临时过渡可用 @Lazy 或 @DependsOn 解决。最好的解决方案是中间层解耦。
+
+### 4.1 为什么不能只用二级缓存？
+❌ 问题一：AOP代理对象一致性无法保证
+如果只用二级缓存，必须在实例化后立即生成代理对象并放入缓存。
+但 Spring 的代理逻辑是在 初始化阶段（initializeBean()）才执行。
+若提前生成代理，可能导致 Bean 生命周期混乱，或代理逻辑缺失，会出现容器中是代理对象，但其他 Bean 注入的是原始对象，造成不一致的情况。
+❌ 问题二：ObjectFactory 的延迟能力缺失
+二级缓存存的是对象本身，无法延迟创建。
+而三级缓存存的是 ObjectFactory，可以在真正需要时再生成代理对象，确保代理逻辑完整。
 
 ## 🔧 技术实现类问题
 
@@ -206,29 +215,110 @@ spring:
 **问题描述：**
 查询1个用户，需要查询N个订单，产生1+N次数据库查询
 
-**解决方案：**
-1. **使用JOIN FETCH**：
-```java
-@Query("SELECT u FROM User u JOIN FETCH u.orders WHERE u.id = :id")
-User findByIdWithOrders(@Param("id") Long id);
+**MyBatis解决方案：**
+
+1. **使用关联查询（JOIN）**：
+```xml
+<!-- 方式1：使用resultMap进行关联映射 -->
+<resultMap id="UserWithOrdersMap" type="User">
+    <id property="id" column="user_id"/>
+    <result property="name" column="user_name"/>
+    <collection property="orders" ofType="Order">
+        <id property="id" column="order_id"/>
+        <result property="orderNo" column="order_no"/>
+        <result property="amount" column="amount"/>
+    </collection>
+</resultMap>
+
+<select id="findUserWithOrders" resultMap="UserWithOrdersMap">
+    SELECT u.id as user_id, u.name as user_name,
+           o.id as order_id, o.order_no, o.amount
+    FROM user u 
+    LEFT JOIN orders o ON u.id = o.user_id 
+    WHERE u.id = #{id}
+</select>
 ```
 
-2. **使用@BatchSize注解**：
-```java
-@OneToMany(mappedBy = "user")
-@BatchSize(size = 10)
-private List<Order> orders;
+2. **使用嵌套查询（分步查询）**：
+```xml
+<!-- 主查询 -->
+<select id="findUserById" resultMap="UserWithOrdersMap">
+    SELECT id, name, email FROM user WHERE id = #{id}
+</select>
+
+<!-- 关联查询 -->
+<select id="findOrdersByUserId" resultType="Order">
+    SELECT id, order_no, amount, user_id FROM orders WHERE user_id = #{userId}
+</select>
+
+<resultMap id="UserWithOrdersMap" type="User">
+    <id property="id" column="id"/>
+    <result property="name" column="name"/>
+    <result property="email" column="email"/>
+    <collection property="orders" 
+                column="id" 
+                ofType="Order"
+                select="findOrdersByUserId"/>
+</resultMap>
 ```
 
-3. **使用@NamedEntityGraph**：
-```java
-@Entity
-@NamedEntityGraph(
-    name = "User.withOrders",
-    attributeNodes = @NamedAttributeNode("orders")
-)
-public class User { ... }
+3. **使用批量查询优化**：
+```xml
+<!-- 批量查询用户 -->
+<select id="findUsersByIds" resultType="User">
+    SELECT id, name, email FROM user 
+    WHERE id IN 
+    <foreach collection="ids" item="id" open="(" separator="," close=")">
+        #{id}
+    </foreach>
+</select>
+
+<!-- 批量查询订单 -->
+<select id="findOrdersByUserIds" resultType="Order">
+    SELECT id, order_no, amount, user_id FROM orders 
+    WHERE user_id IN 
+    <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+        #{userId}
+    </foreach>
+</select>
 ```
+
+4. **使用MyBatis-Plus的关联查询**：
+```java
+// 使用LambdaQueryWrapper进行关联查询
+List<User> users = userMapper.selectList(
+    Wrappers.<User>lambdaQuery()
+        .select(User::getId, User::getName)
+        .in(User::getId, userIds)
+);
+
+// 批量查询关联数据
+List<Order> orders = orderMapper.selectList(
+    Wrappers.<Order>lambdaQuery()
+        .in(Order::getUserId, userIds)
+);
+```
+
+**各方案优缺点对比：**
+
+| 方案 | 优点 | 缺点 | 适用场景 |
+|------|------|------|----------|
+| **关联查询(JOIN)** | • 一次SQL查询完成<br>• 性能最优<br>• 减少网络开销 | • 可能产生笛卡尔积<br>• 数据重复传输<br>• 复杂关联时SQL难维护 | 一对一、一对多关系简单时 |
+| **嵌套查询(分步)** | • SQL简单清晰<br>• 易于维护<br>• 支持懒加载 | • 仍然存在N+1问题<br>• 多次数据库交互<br>• 性能相对较差 | 关联关系复杂，需要懒加载时 |
+| **批量查询优化** | • 减少查询次数<br>• 性能较好<br>• 代码逻辑清晰 | • 需要手动组装数据<br>• 内存占用较大<br>• 代码复杂度增加 | 批量处理场景，数据量适中时 |
+| **MyBatis-Plus** | • 代码简洁<br>• 类型安全<br>• 易于维护 | • 仍需要多次查询<br>• 依赖第三方框架<br>• 复杂查询支持有限 | 简单CRUD操作，追求代码简洁时 |
+
+**性能对比（查询100个用户及其订单）：**
+- 关联查询：1次SQL，最快
+- 批量查询：2次SQL，较快  
+- MyBatis-Plus：2次SQL，中等
+- 嵌套查询：101次SQL，最慢
+
+**推荐使用策略：**
+1. **简单关联**：优先使用关联查询
+2. **复杂关联**：使用批量查询优化
+3. **懒加载需求**：使用嵌套查询
+4. **快速开发**：使用MyBatis-Plus
 
 ### 11. 缓存穿透、缓存雪崩如何解决？
 

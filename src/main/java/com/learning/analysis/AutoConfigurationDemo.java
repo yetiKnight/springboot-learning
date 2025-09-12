@@ -1,6 +1,7 @@
 package com.learning.analysis;
 
 import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -15,6 +16,7 @@ import org.springframework.context.annotation.Configuration;
  * 
  * @author 学习笔记
  */
+@SpringBootApplication
 public class AutoConfigurationDemo {
 
     public static void main(String[] args) {
@@ -24,6 +26,9 @@ public class AutoConfigurationDemo {
         
         // 启用调试模式
         app.setAdditionalProfiles("debug");
+        
+        // 确保以Web应用模式启动
+        app.setWebApplicationType(org.springframework.boot.WebApplicationType.SERVLET);
         
         ConfigurableApplicationContext context = app.run(args);
         
