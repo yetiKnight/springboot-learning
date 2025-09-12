@@ -65,8 +65,8 @@ class SpringbootLearningApplicationTests {
 
         // 查询用户
         var foundUser = userService.findById(savedUser.getId());
-        assertThat(foundUser).isPresent();
-        assertThat(foundUser.get().getUsername()).isEqualTo("testuser");
+        assertThat(foundUser).isNotNull();
+        assertThat(foundUser.getUsername()).isEqualTo("testuser");
     }
 
     /**
@@ -87,8 +87,8 @@ class SpringbootLearningApplicationTests {
 
         // 测试根据用户名查询
         var foundUser = userService.findByUsername("queryuser");
-        assertThat(foundUser).isPresent();
-        assertThat(foundUser.get().getUsername()).isEqualTo("queryuser");
+        assertThat(foundUser).isNotNull();
+        assertThat(foundUser.getUsername()).isEqualTo("queryuser");
 
         // 测试查询所有用户
         var allUsers = userService.findAll();
@@ -142,6 +142,6 @@ class SpringbootLearningApplicationTests {
 
         // 验证用户已被删除
         var foundUser = userService.findById(userId);
-        assertThat(foundUser).isEmpty();
+        assertThat(foundUser).isNull();
     }
 }

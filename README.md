@@ -109,8 +109,8 @@ mvn test
 - [x] 数据验证和自定义验证器
 
 ### 第三阶段：数据访问层
-- [x] JPA/Hibernate实体映射
-- [x] Spring Data JPA Repository
+- [x] MyBatis Plus实体映射
+- [x] MyBatis Plus BaseMapper
 - [x] 数据库连接池配置
 - [x] 事务管理和传播机制
 
@@ -147,10 +147,11 @@ mvn test
 - 性能监控切面
 
 ### 数据访问层
-- JPA实体映射
-- 查询方法设计
-- 事务管理
-- 性能优化
+- MyBatis Plus实体映射
+- 条件构造器查询
+- 分页插件使用
+- 逻辑删除配置
+- 自动填充处理器
 
 ### 缓存机制
 - Spring Cache抽象
@@ -199,6 +200,7 @@ mvn test
 ## 🛠️ 技术栈
 
 - **框架**：SpringBoot 3.2.0
+- **ORM框架**：MyBatis Plus 3.5.4
 - **数据库**：H2、MySQL
 - **缓存**：Redis、Spring Cache
 - **构建工具**：Maven

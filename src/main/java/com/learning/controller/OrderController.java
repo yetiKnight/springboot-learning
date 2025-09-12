@@ -6,8 +6,8 @@ import com.learning.service.OrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,7 +16,6 @@ import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * 订单控制器
@@ -62,9 +61,12 @@ public class OrderController {
     @GetMapping("/{id}")
     public ResponseEntity<Order> getOrderById(@PathVariable Long id) {
         log.info("查询订单，ID：{}", id);
-        Optional<Order> order = orderService.findById(id);
-        return order.map(ResponseEntity::ok)
-                   .orElse(ResponseEntity.notFound().build());
+        Order order = orderService.findById(id);
+        if (order != null) {
+            return ResponseEntity.ok(order);
+        } else {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     /**
@@ -74,9 +76,12 @@ public class OrderController {
     @GetMapping("/search")
     public ResponseEntity<Order> getOrderByNumber(@RequestParam String orderNumber) {
         log.info("查询订单，订单号：{}", orderNumber);
-        Optional<Order> order = orderService.findByOrderNumber(orderNumber);
-        return order.map(ResponseEntity::ok)
-                   .orElse(ResponseEntity.notFound().build());
+        Order order = orderService.findByOrderNumber(orderNumber);
+        if (order != null) {
+            return ResponseEntity.ok(order);
+        } else {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     /**
@@ -86,9 +91,12 @@ public class OrderController {
     @GetMapping("/{id}/details")
     public ResponseEntity<Order> getOrderDetails(@PathVariable Long id) {
         log.info("查询订单详情，ID：{}", id);
-        Optional<Order> order = orderService.findByIdWithOrderItems(id);
-        return order.map(ResponseEntity::ok)
-                   .orElse(ResponseEntity.notFound().build());
+        Order order = orderService.findByIdWithOrderItems(id);
+        if (order != null) {
+            return ResponseEntity.ok(order);
+        } else {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     /**
@@ -96,9 +104,12 @@ public class OrderController {
      * 面试重点：分页查询API
      */
     @GetMapping("/user/{userId}")
-    public ResponseEntity<Page<Order>> getUserOrders(@PathVariable Long userId, Pageable pageable) {
+    public ResponseEntity<IPage<Order>> getUserOrders(@PathVariable Long userId, 
+                                                     @RequestParam(defaultValue = "1") int current,
+                                                     @RequestParam(defaultValue = "10") int size) {
         log.info("查询用户订单列表，用户ID：{}", userId);
-        Page<Order> orders = orderService.findByUserId(userId, pageable);
+        Page<Order> page = new Page<>(current, size);
+        IPage<Order> orders = orderService.findByUserId(userId, page);
         return ResponseEntity.ok(orders);
     }
 

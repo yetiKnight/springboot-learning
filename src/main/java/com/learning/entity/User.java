@@ -1,14 +1,12 @@
 package com.learning.entity;
 
-import jakarta.persistence.*;
+import com.baomidou.mybatisplus.annotation.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
@@ -16,56 +14,55 @@ import java.time.LocalDateTime;
  * 用户实体类
  * 
  * 面试重点知识点：
- * 1. JPA实体映射注解
+ * 1. MyBatis Plus实体映射注解
  * 2. 字段验证注解
  * 3. Lombok注解的使用
  * 4. 审计字段的设计
- * 5. 实体关系映射
+ * 5. 逻辑删除配置
  * 
  * @author 学习笔记
  */
-@Entity
-@Table(name = "users")
+@TableName("users")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class User {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @TableId(type = IdType.AUTO)
     private Long id;
 
     @NotBlank(message = "用户名不能为空")
     @Size(min = 3, max = 50, message = "用户名长度必须在3-50个字符之间")
-    @Column(unique = true, nullable = false, length = 50)
+    @TableField("username")
     private String username;
 
     @NotBlank(message = "密码不能为空")
     @Size(min = 6, message = "密码长度不能少于6个字符")
-    @Column(nullable = false)
+    @TableField("password")
     private String password;
 
     @Email(message = "邮箱格式不正确")
-    @Column(unique = true, length = 100)
+    @TableField("email")
     private String email;
 
-    @Column(name = "first_name", length = 50)
+    @TableField("first_name")
     private String firstName;
 
-    @Column(name = "last_name", length = 50)
+    @TableField("last_name")
     private String lastName;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
+    @TableField("status")
     private UserStatus status = UserStatus.ACTIVE;
 
-    @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @TableField(value = "created_at", fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 
-    @UpdateTimestamp
-    @Column(name = "updated_at", nullable = false)
+    @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updatedAt;
+
+    @TableLogic
+    @TableField("deleted")
+    private Integer deleted = 0;
 
     /**
      * 用户状态枚举

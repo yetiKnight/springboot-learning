@@ -1,18 +1,17 @@
 package com.learning.controller;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.learning.entity.User;
 import com.learning.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Optional;
 
 /**
  * 用户控制器
@@ -48,25 +47,31 @@ public class UserController {
 
     /**
      * 分页查询用户
-     * 面试重点：Pageable参数、分页响应
+     * 面试重点：MyBatis Plus分页参数、分页响应
      */
     @GetMapping("/page")
-    public ResponseEntity<Page<User>> getUsersWithPagination(Pageable pageable) {
-        log.info("分页查询用户: {}", pageable);
-        // 这里需要在Service中实现分页查询
-        return ResponseEntity.ok(Page.empty());
+    public ResponseEntity<IPage<User>> getUsersWithPagination(
+            @RequestParam(defaultValue = "1") Long current,
+            @RequestParam(defaultValue = "10") Long size) {
+        log.info("分页查询用户: current={}, size={}", current, size);
+        Page<User> page = new Page<>(current, size);
+        IPage<User> result = userService.findPage(page);
+        return ResponseEntity.ok(result);
     }
 
     /**
      * 根据ID获取用户
-     * 面试重点：路径参数、Optional处理
+     * 面试重点：路径参数、空值处理
      */
     @GetMapping("/{id}")
     public ResponseEntity<User> getUserById(@PathVariable Long id) {
         log.info("根据ID获取用户: {}", id);
-        Optional<User> user = userService.findById(id);
-        return user.map(ResponseEntity::ok)
-                   .orElse(ResponseEntity.notFound().build());
+        User user = userService.findById(id);
+        if (user != null) {
+            return ResponseEntity.ok(user);
+        } else {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     /**
@@ -76,9 +81,12 @@ public class UserController {
     @GetMapping("/search")
     public ResponseEntity<User> getUserByUsername(@RequestParam String username) {
         log.info("根据用户名获取用户: {}", username);
-        Optional<User> user = userService.findByUsername(username);
-        return user.map(ResponseEntity::ok)
-                   .orElse(ResponseEntity.notFound().build());
+        User user = userService.findByUsername(username);
+        if (user != null) {
+            return ResponseEntity.ok(user);
+        } else {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     /**

@@ -1,14 +1,12 @@
 package com.learning.entity;
 
-import jakarta.persistence.*;
+import com.baomidou.mybatisplus.annotation.*;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -17,61 +15,60 @@ import java.time.LocalDateTime;
  * 订单项实体类
  * 
  * 面试重点知识点：
- * 1. 多对一关系映射
+ * 1. MyBatis Plus实体映射
  * 2. 外键约束
  * 3. 级联操作
  * 4. 实体验证
  * 
  * @author 学习笔记
  */
-@Entity
-@Table(name = "order_items")
+@TableName("order_items")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class OrderItem {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @TableId(type = IdType.AUTO)
     private Long id;
 
     @NotNull(message = "订单ID不能为空")
-    @Column(name = "order_id", nullable = false)
+    @TableField("order_id")
     private Long orderId;
 
     @NotNull(message = "商品ID不能为空")
-    @Column(name = "product_id", nullable = false)
+    @TableField("product_id")
     private Long productId;
 
     @NotNull(message = "商品名称不能为空")
-    @Column(name = "product_name", nullable = false, length = 200)
+    @TableField("product_name")
     private String productName;
 
     @Min(value = 1, message = "商品数量必须大于0")
-    @Column(name = "quantity", nullable = false)
+    @TableField("quantity")
     private Integer quantity;
 
     @DecimalMin(value = "0.01", message = "商品价格必须大于0")
-    @Column(name = "price", nullable = false, precision = 10, scale = 2)
+    @TableField("price")
     private BigDecimal price;
 
     @DecimalMin(value = "0.00", message = "商品总价不能为负数")
-    @Column(name = "total_price", nullable = false, precision = 10, scale = 2)
+    @TableField("total_price")
     private BigDecimal totalPrice;
 
-    @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @TableField(value = "created_at", fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 
-    @UpdateTimestamp
-    @Column(name = "updated_at", nullable = false)
+    @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updatedAt;
+
+    @TableLogic
+    @TableField("deleted")
+    private Integer deleted = 0;
 
     /**
      * 订单关系 - 多对一
-     * 面试重点：@ManyToOne注解的使用
+     * 面试重点：MyBatis Plus中通过Service层处理关联关系
      */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "order_id", insertable = false, updatable = false)
+    @TableField(exist = false)
     private Order order;
 }

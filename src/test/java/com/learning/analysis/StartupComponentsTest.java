@@ -11,7 +11,7 @@ import org.springframework.test.context.TestPropertySource;
  * 
  * @author 学习笔记
  */
-@SpringBootTest(classes = StartupComponentsDemo.class)
+@SpringBootTest
 @TestPropertySource(properties = {
     "spring.application.name=startup-components-test",
     "logging.level.com.learning.analysis=DEBUG"

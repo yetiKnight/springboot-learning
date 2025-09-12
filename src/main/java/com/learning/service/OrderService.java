@@ -9,16 +9,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * 订单服务类
@@ -51,7 +49,7 @@ public class OrderService {
         log.info("创建订单，订单号：{}", order.getOrderNumber());
         
         // 1. 验证用户是否存在
-        if (!userRepository.existsById(order.getUserId())) {
+        if (userRepository.selectById(order.getUserId()) == null) {
             throw new RuntimeException("用户不存在");
         }
         
@@ -67,7 +65,8 @@ public class OrderService {
         order.setTotalAmount(totalAmount);
         
         // 4. 保存订单
-        Order savedOrder = orderRepository.save(order);
+        orderRepository.insert(order);
+        Order savedOrder = order;
         
         // 5. 保存订单项
         for (OrderItem item : orderItems) {
@@ -85,9 +84,9 @@ public class OrderService {
      */
     @Cacheable(value = "orders", key = "#id")
     @LogExecutionTime(logArgs = true, logResult = true)
-    public Optional<Order> findById(Long id) {
+    public Order findById(Long id) {
         log.info("查询订单，ID：{}", id);
-        return orderRepository.findById(id);
+        return orderRepository.selectById(id);
     }
 
     /**
@@ -96,7 +95,7 @@ public class OrderService {
      */
     @Cacheable(value = "orders", key = "#orderNumber")
     @LogExecutionTime(logArgs = true, logResult = true)
-    public Optional<Order> findByOrderNumber(String orderNumber) {
+    public Order findByOrderNumber(String orderNumber) {
         log.info("查询订单，订单号：{}", orderNumber);
         return orderRepository.findByOrderNumber(orderNumber);
     }
@@ -107,18 +106,18 @@ public class OrderService {
      */
     @Transactional(readOnly = true)
     @LogExecutionTime
-    public Page<Order> findByUserId(Long userId, Pageable pageable) {
+    public IPage<Order> findByUserId(Long userId, Page<Order> page) {
         log.info("查询用户订单列表，用户ID：{}", userId);
-        return orderRepository.findByUserId(userId, pageable);
+        return orderRepository.findByUserId(page, userId);
     }
 
     /**
      * 查询订单详情（包含订单项）
-     * 面试重点：JOIN FETCH查询
+     * 面试重点：JOIN查询
      */
     @Transactional(readOnly = true)
     @LogExecutionTime
-    public Optional<Order> findByIdWithOrderItems(Long id) {
+    public Order findByIdWithOrderItems(Long id) {
         log.info("查询订单详情，ID：{}", id);
         return orderRepository.findByIdWithOrderItems(id);
     }
@@ -133,8 +132,10 @@ public class OrderService {
     public Order updateOrderStatus(Long id, Order.OrderStatus status) {
         log.info("更新订单状态，ID：{}，状态：{}", id, status);
         
-        Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("订单不存在"));
+        Order order = orderRepository.selectById(id);
+        if (order == null) {
+            throw new RuntimeException("订单不存在");
+        }
         
         // 验证状态转换是否合法
         if (!isValidStatusTransition(order.getStatus(), status)) {
@@ -144,10 +145,10 @@ public class OrderService {
         order.setStatus(status);
         order.setUpdatedAt(LocalDateTime.now());
         
-        Order updatedOrder = orderRepository.save(order);
+        orderRepository.updateById(order);
         log.info("订单状态更新成功，ID：{}", id);
         
-        return updatedOrder;
+        return order;
     }
 
     /**
@@ -160,7 +161,7 @@ public class OrderService {
     public int batchUpdateOrderStatus(List<Long> ids, Order.OrderStatus status) {
         log.info("批量更新订单状态，订单数量：{}，状态：{}", ids.size(), status);
         
-        int updatedCount = orderRepository.batchUpdateOrderStatus(ids, status, LocalDateTime.now());
+        int updatedCount = orderRepository.batchUpdateOrderStatus(ids, status.toString(), LocalDateTime.now());
         log.info("批量更新订单状态完成，更新数量：{}", updatedCount);
         
         return updatedCount;
@@ -176,8 +177,10 @@ public class OrderService {
     public Order cancelOrder(Long id) {
         log.info("取消订单，ID：{}", id);
         
-        Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("订单不存在"));
+        Order order = orderRepository.selectById(id);
+        if (order == null) {
+            throw new RuntimeException("订单不存在");
+        }
         
         // 验证订单是否可以取消
         if (order.getStatus() != Order.OrderStatus.PENDING) {
@@ -188,10 +191,10 @@ public class OrderService {
         order.setStatus(Order.OrderStatus.CANCELLED);
         order.setUpdatedAt(LocalDateTime.now());
         
-        Order updatedOrder = orderRepository.save(order);
+        orderRepository.updateById(order);
         log.info("订单取消成功，ID：{}", id);
         
-        return updatedOrder;
+        return order;
     }
 
     /**
@@ -204,8 +207,10 @@ public class OrderService {
     public void deleteOrder(Long id) {
         log.info("删除订单，ID：{}", id);
         
-        Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("订单不存在"));
+        Order order = orderRepository.selectById(id);
+        if (order == null) {
+            throw new RuntimeException("订单不存在");
+        }
         
         // 验证订单是否可以删除
         if (order.getStatus() == Order.OrderStatus.SHIPPED || 

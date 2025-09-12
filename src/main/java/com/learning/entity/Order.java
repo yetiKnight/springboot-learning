@@ -1,13 +1,11 @@
 package com.learning.entity;
 
-import jakarta.persistence.*;
+import com.baomidou.mybatisplus.annotation.*;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -17,7 +15,7 @@ import java.util.List;
  * 订单实体类
  * 
  * 面试重点知识点：
- * 1. JPA实体关系映射
+ * 1. MyBatis Plus实体映射
  * 2. 一对多、多对一关系
  * 3. 级联操作和懒加载
  * 4. 审计字段的设计
@@ -25,49 +23,48 @@ import java.util.List;
  * 
  * @author 学习笔记
  */
-@Entity
-@Table(name = "orders")
+@TableName("orders")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class Order {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @TableId(type = IdType.AUTO)
     private Long id;
 
     @NotNull(message = "订单号不能为空")
-    @Column(name = "order_number", unique = true, nullable = false, length = 50)
+    @TableField("order_number")
     private String orderNumber;
 
     @NotNull(message = "用户ID不能为空")
-    @Column(name = "user_id", nullable = false)
+    @TableField("user_id")
     private Long userId;
 
     @DecimalMin(value = "0.01", message = "订单金额必须大于0")
-    @Column(name = "total_amount", nullable = false, precision = 10, scale = 2)
+    @TableField("total_amount")
     private BigDecimal totalAmount;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
+    @TableField("status")
     private OrderStatus status = OrderStatus.PENDING;
 
-    @Column(name = "remark", length = 500)
+    @TableField("remark")
     private String remark;
 
-    @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @TableField(value = "created_at", fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 
-    @UpdateTimestamp
-    @Column(name = "updated_at", nullable = false)
+    @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updatedAt;
+
+    @TableLogic
+    @TableField("deleted")
+    private Integer deleted = 0;
 
     /**
      * 订单项列表 - 一对多关系
-     * 面试重点：@OneToMany注解的使用
+     * 面试重点：MyBatis Plus中通过Service层处理关联关系
      */
-    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @TableField(exist = false)
     private List<OrderItem> orderItems;
 
     /**

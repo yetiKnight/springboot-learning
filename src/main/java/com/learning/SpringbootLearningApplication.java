@@ -1,5 +1,6 @@
 package com.learning;
 
+import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cache.annotation.EnableCaching;
@@ -22,6 +23,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableCaching  // 启用缓存支持
 @EnableAsync    // 启用异步方法支持
 @EnableScheduling // 启用定时任务支持
+@MapperScan("com.learning.repository") // 扫描Mapper接口
 public class SpringbootLearningApplication {
 
     public static void main(String[] args) {
