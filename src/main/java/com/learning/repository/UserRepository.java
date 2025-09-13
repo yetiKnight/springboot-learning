@@ -22,7 +22,7 @@ import java.util.List;
  * @author 学习笔记
  */
 @Mapper
-public interface UserRepository extends BaseMapper<User> {
+public interface UserRepository extends BaseMapper<User>{
 
     /**
      * 根据用户名查询用户
